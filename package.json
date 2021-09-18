@@ -3,17 +3,32 @@
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
-    "start": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts"
+    "start": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts",
+    "format": "prettier --write src/**/*.{js,jsx,ts,tsx}",
+    "lint": "eslint --fix src/**/*.{js,jsx,ts,tsx}"
   },
   "repository": "git@github.com:danielwuhoo/dingle-unleashed.git",
   "author": "danielwuhoo <danielwuhoo@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@discordjs/builders": "^0.6.0",
+    "@discordjs/rest": "^0.1.0-canary.0",
+    "discord-api-types": "^0.23.1",
     "discord.js": "^13.1.0",
+    "dotenv": "^10.0.0",
     "mongoose": "^6.0.5",
+    "reflect-metadata": "^0.1.13",
+    "tsyringe": "^4.6.0",
     "typescript": "^4.4.3"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.31.1",
+    "@typescript-eslint/parser": "^4.31.1",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-typescript-prettier": "^4.2.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.4.1",
     "ts-node": "^10.2.1",
     "ts-node-dev": "^1.1.8"
   }
