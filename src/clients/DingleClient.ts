@@ -19,7 +19,7 @@ export default class DingleClient extends Client {
         @inject(CommandRepository) commandRepository: CommandRepository,
     ) {
         super({
-            intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
+            intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_VOICE_STATES],
         });
         this.config = config;
         this.eventRepository = eventRepository;
@@ -28,14 +28,10 @@ export default class DingleClient extends Client {
 
     public async init(): Promise<void> {
         await this.commandRepository.init();
-        await this.registerEventHandlers();
-
-        this.login(this.config.token);
-    }
-
-    private async registerEventHandlers() {
         await this.eventRepository.init();
 
         this.eventRepository.events.forEach((event: Event) => this.on(event.name, event.callback));
+
+        this.login(this.config.token);
     }
 }

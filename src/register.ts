@@ -9,8 +9,6 @@ dotenv.config();
 const commandRepository: CommandRepository = container.resolve(CommandRepository);
 const config: DingleConfig = container.resolve(DingleConfig);
 
-console.log(config);
-
 (async () => {
     await commandRepository.init();
     await commandRepository.registerCommands(config);
