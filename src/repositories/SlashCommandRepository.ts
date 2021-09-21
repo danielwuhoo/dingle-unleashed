@@ -3,11 +3,11 @@ import { singleton } from 'tsyringe';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
 import { Config } from '../common/types';
-import Command from '../interactions/Command';
+import SlashCommand from '../interactions/SlashCommand';
 
 @singleton()
-export default class CommandRepository {
-    public commands: { [name: string]: Command };
+export default class SlashCommandRepository {
+    public commands: { [name: string]: SlashCommand };
 
     public constructor() {
         this.commands = {};
@@ -15,8 +15,8 @@ export default class CommandRepository {
 
     public async init(): Promise<void> {
         try {
-            const files: string[] = await readdir(`${__dirname}/../interactions/commands`);
-            this.commands = (await Promise.all(files.map((file) => import(`../interactions/commands/${file}`))))
+            const files: string[] = await readdir(`${__dirname}/../interactions/slashCommands`);
+            this.commands = (await Promise.all(files.map((file) => import(`../interactions/slashCommands/${file}`))))
                 .map((command) => command.default)
                 .reduce((commands, command) => {
                     // eslint-disable-next-line new-cap
@@ -43,7 +43,7 @@ export default class CommandRepository {
         }
     }
 
-    public getCommand(name: string): Command {
+    public getCommand(name: string): SlashCommand {
         return this.commands[name];
     }
 }

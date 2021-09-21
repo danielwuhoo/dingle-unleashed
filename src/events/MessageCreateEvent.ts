@@ -3,9 +3,7 @@ import { Event } from '../common/types';
 
 const MessageCreateEvent: Event = {
     name: 'messageCreate',
-    callback: (message: Message) => {
-        return;
-    },
+    callback: (message: Message) => {},
 };
 
 export default MessageCreateEvent;

@@ -1,18 +1,18 @@
-import { Interaction } from 'discord.js';
+import { CommandInteraction, Interaction } from 'discord.js';
 import { container } from 'tsyringe';
 import { Event } from '../common/types';
-import Command from '../interactions/Command';
-import CommandRepository from '../repositories/CommandRepository';
+import SlashCommand from '../interactions/SlashCommand';
+import SlashCommandRepository from '../repositories/SlashCommandRepository';
 
 const CommandInteractionEvent: Event = {
     name: 'interactionCreate',
     callback: async (interaction: Interaction) => {
         if (!interaction.isCommand()) return;
 
-        const commandRepository: CommandRepository = container.resolve(CommandRepository);
-        const command: Command = commandRepository.getCommand(interaction.commandName);
+        const commandRepository: SlashCommandRepository = container.resolve(SlashCommandRepository);
+        const command: SlashCommand = commandRepository.getCommand(interaction.commandName);
 
-        if (command) command.run(interaction);
+        if (command) command.setInteraction(interaction as CommandInteraction).run();
     },
 };
 

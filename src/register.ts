@@ -1,12 +1,12 @@
 import 'reflect-metadata';
 import { container } from 'tsyringe';
 import dotenv from 'dotenv';
-import CommandRepository from './repositories/CommandRepository';
+import SlashCommandRepository from './repositories/SlashCommandRepository';
 import DingleConfig from './models/DingleConfig';
 
 dotenv.config();
 
-const commandRepository: CommandRepository = container.resolve(CommandRepository);
+const commandRepository: SlashCommandRepository = container.resolve(SlashCommandRepository);
 const config: DingleConfig = container.resolve(DingleConfig);
 
 (async () => {
