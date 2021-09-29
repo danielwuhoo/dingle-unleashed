@@ -1,5 +1,6 @@
 export interface Config {
     token: string;
+    googleAPIKey: string;
     clientId: string;
     guildId: string;
 }
