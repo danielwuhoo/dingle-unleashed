@@ -51,7 +51,7 @@ export default class PlayOperation {
             const voiceConnection = joinVoiceChannel(options);
             const audioPlayer = createAudioPlayer();
 
-            audioSubscription = new AudioSubscription(voiceConnection, audioPlayer);
+            audioSubscription = new AudioSubscription(voiceConnection, audioPlayer, this.interaction.guild);
 
             this.audioSubscriptionRepository.upsert(this.interaction.guildId, audioSubscription);
         }
@@ -68,6 +68,6 @@ export default class PlayOperation {
 
         const track = TrackFactory.createTrack(query);
         await audioSubscription.enqueue(track);
-        await this.interaction.editReply({ content: 'song added to queue' });
+        await this.interaction.editReply({ content: `${track.title} added to queue` });
     }
 }

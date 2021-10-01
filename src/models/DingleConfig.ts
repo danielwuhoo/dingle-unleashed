@@ -11,10 +11,16 @@ export default class DingleConfig implements Config {
 
     guildId: string;
 
+    channelId: string;
+
+    messageId: string;
+
     public constructor() {
         this.token = process.env.TOKEN;
         this.googleAPIKey = process.env.GOOGLE_API_KEY;
         this.clientId = process.env.CLIENT_ID;
         this.guildId = process.env.GUILD_ID;
+        this.channelId = process.env.CHANNEL_ID;
+        this.messageId = process.env.MESSAGE_ID;
     }
 }

@@ -6,7 +6,9 @@ import {
     VoiceConnectionDisconnectReason,
     VoiceConnectionStatus,
 } from '@discordjs/voice';
+import { Guild, Message, MessageEmbed, TextChannel, VoiceChannel } from 'discord.js';
 import { promisify } from 'util';
+import DingleConfig from '../models/DingleConfig';
 import Track from './Track';
 
 export default class AudioSubscription {
@@ -14,16 +16,22 @@ export default class AudioSubscription {
 
     public audioPlayer: AudioPlayer;
 
+    public guild: Guild;
+
     public queue: Track[];
+
+    public embed: MessageEmbed;
 
     public readyLock: boolean;
 
     public queueLock: boolean;
 
-    public constructor(voiceConnection: VoiceConnection, audioPlayer: AudioPlayer) {
+    public constructor(voiceConnection: VoiceConnection, audioPlayer: AudioPlayer, guild: Guild) {
+        this.guild = guild;
         this.queue = [];
         this.readyLock = false;
         this.queueLock = false;
+        this.embed = new MessageEmbed();
 
         voiceConnection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -47,6 +55,7 @@ export default class AudioSubscription {
             } else if (newState.status === VoiceConnectionStatus.Destroyed) {
                 this.voiceConnection = null;
                 this.stop();
+                this.updateEmbed();
             } else if (
                 !this.readyLock &&
                 (newState.status === VoiceConnectionStatus.Connecting ||
@@ -98,7 +107,58 @@ export default class AudioSubscription {
         return this.audioPlayer.stop(true);
     }
 
+    public getEmbed(): MessageEmbed {
+        return this.embed;
+    }
+
+    private async updateEmbed(): Promise<void> {
+        if (this.voiceConnection?.joinConfig?.channelId) {
+            const voiceChannel: VoiceChannel = this.guild.channels.cache.get(
+                this.voiceConnection.joinConfig.channelId,
+            ) as VoiceChannel;
+            this.embed.setAuthor(`Connected to: ${voiceChannel.name}`);
+        } else {
+            this.embed.setAuthor(`Not connected to a channel`);
+        }
+
+        if (this.queue.length > 0) {
+            if (this.audioPlayer.state.status === AudioPlayerStatus.Playing) {
+                this.embed.setFields(
+                    this.queue.map((track) => {
+                        return {
+                            name: track.title,
+                            value: `Duration: ${AudioSubscription.secondsToHms(track.duration)}`,
+                        };
+                    }),
+                );
+            } else {
+                this.embed.setDescription(
+                    `Currently playing: ${this.queue[0].title}\nDuration: ${AudioSubscription.secondsToHms(
+                        this.queue[0].duration,
+                    )}`,
+                );
+                this.embed.setThumbnail(this.queue[0].thumbnailUrl);
+                this.embed.setFields(
+                    this.queue.slice(1).map((track) => {
+                        return {
+                            name: track.title,
+                            value: `Duration: ${AudioSubscription.secondsToHms(track.duration)}`,
+                        };
+                    }),
+                );
+            }
+        } else {
+            this.embed.setDescription('The queue is empty, use `/play` to add to the queue');
+            this.embed.setThumbnail('');
+            this.embed.setFields([]);
+        }
+        const textChannel: TextChannel = this.guild.channels.cache.get(new DingleConfig().channelId) as TextChannel;
+        const message: Message = (await textChannel.messages.fetch(new DingleConfig().messageId)) as Message;
+        message.edit({ embeds: [this.embed] });
+    }
+
     private async handleQueue(): Promise<void> {
+        await this.updateEmbed();
         if (this.queue.length === 0) {
             this.voiceConnection.disconnect();
             return;
@@ -119,5 +179,13 @@ export default class AudioSubscription {
         } finally {
             this.queueLock = false;
         }
+    }
+
+    private static secondsToHms(d: number): string {
+        const h = Math.floor(d / 3600);
+        const m = Math.floor((d % 3600) / 60);
+        const s = Math.floor((d % 3600) % 60);
+
+        return `${h > 0 ? `${h}h` : ''}${m}m${s}s`;
     }
 }

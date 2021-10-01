@@ -40,5 +40,6 @@ export default class YoutubeTrack extends Track {
 
         this.title = this.videoInfo.videoDetails.title;
         this.thumbnailUrl = this.videoInfo.videoDetails.thumbnails[0].url;
+        this.duration = parseInt(this.videoInfo.videoDetails.lengthSeconds, 10);
     }
 }

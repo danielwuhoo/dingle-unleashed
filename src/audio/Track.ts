@@ -7,6 +7,8 @@ export default abstract class Track {
 
     public thumbnailUrl: string;
 
+    public duration: number;
+
     readonly onStart: () => void;
 
     readonly onFinish: () => void;

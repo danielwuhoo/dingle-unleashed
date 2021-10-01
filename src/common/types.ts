@@ -3,6 +3,8 @@ export interface Config {
     googleAPIKey: string;
     clientId: string;
     guildId: string;
+    channelId: string;
+    messageId: string;
 }
 
 export interface Event {

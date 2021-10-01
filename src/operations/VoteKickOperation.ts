@@ -32,7 +32,7 @@ export default class VoteKickOperation {
             return;
         }
 
-        const votesNeeded: number = Math.max(3, voiceChannel.members.size / 2);
+        const votesNeeded: number = Math.max(3, Math.ceil(voiceChannel.members.size / 2));
         const votes: Set<GuildMember> = new Set();
         const kickButton: MessageButton = new MessageButton().setCustomId('kick').setLabel('Kick').setStyle('DANGER');
         const actionRow: MessageActionRow = new MessageActionRow().addComponents(kickButton);
