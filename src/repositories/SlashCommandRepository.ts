@@ -33,7 +33,7 @@ export default class SlashCommandRepository {
         try {
             console.log('Started refreshing application (/) commands.');
 
-            await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), {
+            await rest.post(Routes.applicationGuildCommands(config.clientId, config.guildId), {
                 body: Object.values(this.commands).map((command) => command.toJSON()),
             });
 
