@@ -67,7 +67,12 @@ export default class PlayOperation {
         }
 
         const track = TrackFactory.createTrack(query);
-        await audioSubscription.enqueue(track);
-        await this.interaction.editReply({ content: `${track.title} added to queue` });
+
+        try {
+            await audioSubscription.enqueue(track);
+            await this.interaction.editReply({ content: `${track.title} added to queue` });
+        } catch (err) {
+            await this.interaction.editReply({ content: `Unable to add track to queue` });
+        }
     }
 }
