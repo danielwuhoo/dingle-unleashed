@@ -1,12 +1,17 @@
 {
   "name": "dingle-unleashed",
   "version": "1.0.0",
-  "main": "src/index.js",
+  "main": "dist/src/index.js",
   "scripts": {
-    "start": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts",
+    "check-types": "tsc",
+    "start": "node dist/index.js",
     "format": "prettier --write src/**/*.{js,jsx,ts,tsx}",
-    "lint": "eslint --fix src/**/*.{js,jsx,ts,tsx}"
+    "lint": "eslint --fix src/**/*.{js,jsx,ts,tsx}",
+    "babel": "babel src --out-dir dist --extensions \".ts\" --source-maps inline",
+    "build": "yarn run check-types && yarn run babel"
   },
+  "type": "commonjs",
   "repository": "git@github.com:danielwuhoo/dingle-unleashed.git",
   "author": "danielwuhoo <danielwuhoo@gmail.com>",
   "license": "MIT",
@@ -15,6 +20,7 @@
     "@discordjs/opus": "^0.6.0",
     "@discordjs/rest": "^0.1.0-canary.0",
     "@discordjs/voice": "^0.6.0",
+    "core-js": "^3.18.1",
     "discord-api-types": "^0.23.1",
     "discord.js": "^13.1.0",
     "dotenv": "^10.0.0",
@@ -22,14 +28,24 @@
     "libsodium-wrappers": "^0.7.9",
     "mongoose": "^6.0.5",
     "reflect-metadata": "^0.1.13",
+    "regenerator-runtime": "^0.13.9",
     "tsyringe": "^4.6.0",
     "typescript": "^4.4.3",
     "ytdl-core": "^4.9.1"
   },
   "devDependencies": {
+    "@babel/cli": "^7.15.7",
+    "@babel/core": "^7.15.5",
+    "@babel/plugin-proposal-class-properties": "^7.14.5",
+    "@babel/plugin-proposal-decorators": "^7.15.4",
+    "@babel/plugin-transform-modules-commonjs": "^7.15.4",
+    "@babel/preset-env": "^7.15.6",
+    "@babel/preset-typescript": "^7.15.0",
     "@types/node": "^16.10.1",
     "@typescript-eslint/eslint-plugin": "^4.31.1",
     "@typescript-eslint/parser": "^4.31.1",
+    "babel-plugin-parameter-decorator": "^1.0.16",
+    "babel-plugin-transform-typescript-metadata": "^0.3.2",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-typescript-prettier": "^4.2.0",
     "eslint-config-prettier": "^8.3.0",
@@ -37,5 +53,8 @@
     "prettier": "^2.4.1",
     "ts-node": "^10.2.1",
     "ts-node-dev": "^1.1.8"
+  },
+  "engines": {
+    "node": "16.10.0"
   }
 }
