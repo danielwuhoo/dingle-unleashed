@@ -7,7 +7,16 @@ import {
     VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { error } from 'console';
-import { EmbedFieldData, Guild, Message, MessageEmbed, TextChannel, VoiceChannel } from 'discord.js';
+import {
+    EmbedFieldData,
+    Guild,
+    Message,
+    MessageActionRow,
+    MessageButton,
+    MessageEmbed,
+    TextChannel,
+    VoiceChannel,
+} from 'discord.js';
 import { promisify } from 'util';
 import DingleConfig from '../models/DingleConfig';
 import Track from './Track';
@@ -23,6 +32,8 @@ export default class AudioSubscription {
 
     public embed: MessageEmbed;
 
+    public actionRow: MessageActionRow;
+
     public readyLock: boolean;
 
     public queueLock: boolean;
@@ -33,6 +44,10 @@ export default class AudioSubscription {
         this.readyLock = false;
         this.queueLock = false;
         this.embed = new MessageEmbed().setColor('#11f0b1');
+        this.actionRow = new MessageActionRow().addComponents(
+            new MessageButton().setCustomId('skip').setLabel('Skip').setStyle('PRIMARY'),
+            new MessageButton().setCustomId('stop').setLabel('Stop').setStyle('DANGER'),
+        );
 
         voiceConnection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -148,7 +163,7 @@ export default class AudioSubscription {
         //TODO: pull dynamically from a database
         const textChannel: TextChannel = this.guild.channels.cache.get(new DingleConfig().channelId) as TextChannel;
         const message: Message = (await textChannel.messages.fetch(new DingleConfig().messageId)) as Message;
-        message.edit({ embeds: [this.embed] });
+        message.edit({ embeds: [this.embed], components: [this.actionRow] });
     }
 
     private async handleQueue(): Promise<void> {

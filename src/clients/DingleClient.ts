@@ -7,6 +7,7 @@ import EventRepository from '../repositories/EventRepository';
 import MenuCommandRepository from '../repositories/MenuCommandRepository';
 import AudioSubscriptionRepository from '../repositories/AudioSubscriptionRepository';
 import YoutubeService from '../audio/YoutubeService';
+import ButtonCommandRepository from '../repositories/ButtonCommandRepository';
 
 @singleton()
 export default class DingleClient extends Client {
@@ -18,6 +19,8 @@ export default class DingleClient extends Client {
 
     public menuCommandRepository: MenuCommandRepository;
 
+    public buttonCommandRepository: ButtonCommandRepository;
+
     public audioSubscriptionRepository: AudioSubscriptionRepository;
 
     public youtubeService: YoutubeService;
@@ -27,6 +30,7 @@ export default class DingleClient extends Client {
         @inject(EventRepository) eventRepository: EventRepository,
         @inject(SlashCommandRepository) commandRepository: SlashCommandRepository,
         @inject(MenuCommandRepository) menuCommandRepository: MenuCommandRepository,
+        @inject(ButtonCommandRepository) buttonCommandRepository: ButtonCommandRepository,
         @inject(AudioSubscriptionRepository) audioSubscriptionRepository: AudioSubscriptionRepository,
         @inject(YoutubeService) youtubeService: YoutubeService,
     ) {
@@ -37,6 +41,7 @@ export default class DingleClient extends Client {
         this.eventRepository = eventRepository;
         this.commandRepository = commandRepository;
         this.menuCommandRepository = menuCommandRepository;
+        this.buttonCommandRepository = buttonCommandRepository;
         this.audioSubscriptionRepository = audioSubscriptionRepository;
         this.youtubeService = youtubeService;
     }
@@ -44,6 +49,7 @@ export default class DingleClient extends Client {
     public async init(): Promise<void> {
         await this.commandRepository.init();
         await this.menuCommandRepository.init();
+        await this.buttonCommandRepository.init();
         await this.eventRepository.init();
         await this.audioSubscriptionRepository.init();
         await this.youtubeService.init();
