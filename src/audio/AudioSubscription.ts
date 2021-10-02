@@ -174,7 +174,7 @@ export default class AudioSubscription {
             const resource = await nextTrack.createAudioResource();
             this.audioPlayer.play(resource);
         } catch (err) {
-            // log error
+            console.error(err);
             this.handleQueue();
         } finally {
             this.queueLock = false;
