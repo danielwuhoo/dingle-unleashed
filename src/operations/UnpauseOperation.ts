@@ -4,7 +4,7 @@ import AudioSubscription from '../audio/AudioSubscription';
 import AudioSubscriptionRepository from '../repositories/AudioSubscriptionRepository';
 
 @autoInjectable()
-export default class StopOperation {
+export default class UnpauseOperation {
     readonly interaction: CommandInteraction | ButtonInteraction;
 
     readonly audioSubscriptionRepository: AudioSubscriptionRepository;
@@ -20,10 +20,10 @@ export default class StopOperation {
     public async run(): Promise<void> {
         const audioSubscription: AudioSubscription = this.audioSubscriptionRepository.getById(this.interaction.guildId);
 
-        if (audioSubscription && audioSubscription.voiceConnection && audioSubscription.stop()) {
-            this.interaction.reply({ content: 'Audio has been stopped', ephemeral: true });
+        if (audioSubscription && audioSubscription.voiceConnection && audioSubscription.unpause()) {
+            this.interaction.reply({ content: 'Audio has been unpaused', ephemeral: true });
         } else {
-            this.interaction.reply({ content: 'Nothing to stop', ephemeral: true });
+            this.interaction.reply({ content: 'Nothing to unpause', ephemeral: true });
         }
     }
 }

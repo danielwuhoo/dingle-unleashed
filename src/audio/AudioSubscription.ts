@@ -44,10 +44,7 @@ export default class AudioSubscription {
         this.readyLock = false;
         this.queueLock = false;
         this.embed = new MessageEmbed().setColor('#11f0b1');
-        this.actionRow = new MessageActionRow().addComponents(
-            new MessageButton().setCustomId('skip').setLabel('Skip').setStyle('PRIMARY'),
-            new MessageButton().setCustomId('stop').setLabel('Stop').setStyle('DANGER'),
-        );
+        this.actionRow = null;
 
         voiceConnection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -72,6 +69,7 @@ export default class AudioSubscription {
                 this.voiceConnection = null;
                 this.stop();
                 this.updateEmbed();
+                this.updateActionRow();
             } else if (
                 !this.readyLock &&
                 (newState.status === VoiceConnectionStatus.Connecting ||
@@ -89,6 +87,9 @@ export default class AudioSubscription {
         });
 
         audioPlayer.on('stateChange', (oldState, newState) => {
+            if (newState.status === AudioPlayerStatus.Paused || newState.status === AudioPlayerStatus.Playing) {
+                this.updateActionRow();
+            }
             if (newState.status === AudioPlayerStatus.Idle && oldState.status !== AudioPlayerStatus.Idle) {
                 // If the Idle state is entered from a non-Idle state, it means that an audio resource has finished playing.
                 // The queue is then processed to start playing the next track, if one is available.
@@ -122,6 +123,14 @@ export default class AudioSubscription {
         return this.audioPlayer.stop();
     }
 
+    public pause(): boolean {
+        return this.audioPlayer.pause();
+    }
+
+    public unpause(): boolean {
+        return this.audioPlayer.unpause();
+    }
+
     public stop(): boolean {
         this.queueLock = true;
         this.queue = [];
@@ -133,7 +142,14 @@ export default class AudioSubscription {
         return this.embed;
     }
 
+    public getPlayerState(): AudioPlayerStatus {
+        return this.audioPlayer.state.status;
+    }
+
     private async updateEmbed(): Promise<void> {
+        //TODO: pull dynamically from a database
+        const textChannel: TextChannel = this.guild.channels.cache.get(new DingleConfig().channelId) as TextChannel;
+        const message: Message = (await textChannel.messages.fetch(new DingleConfig().messageId)) as Message;
         if (this.voiceConnection?.joinConfig?.channelId) {
             const voiceChannel: VoiceChannel = this.guild.channels.cache.get(
                 this.voiceConnection.joinConfig.channelId,
@@ -160,10 +176,24 @@ export default class AudioSubscription {
             this.embed.setThumbnail('');
             this.embed.setFields([]);
         }
-        //TODO: pull dynamically from a database
+        message.edit({ embeds: [this.embed] });
+    }
+
+    private async updateActionRow(): Promise<void> {
         const textChannel: TextChannel = this.guild.channels.cache.get(new DingleConfig().channelId) as TextChannel;
         const message: Message = (await textChannel.messages.fetch(new DingleConfig().messageId)) as Message;
-        message.edit({ embeds: [this.embed], components: [this.actionRow] });
+        this.actionRow = null;
+        if (this.voiceConnection) {
+            this.actionRow = new MessageActionRow().addComponents(
+                new MessageButton()
+                    .setCustomId('togglePause')
+                    .setLabel(this.audioPlayer.state.status === AudioPlayerStatus.Paused ? 'Unpause' : 'Pause')
+                    .setStyle('PRIMARY'),
+                new MessageButton().setCustomId('skip').setLabel('Skip').setStyle('PRIMARY'),
+                new MessageButton().setCustomId('stop').setLabel('Stop').setStyle('DANGER'),
+            );
+        }
+        message.edit({ components: this.actionRow ? [this.actionRow] : [] });
     }
 
     private async handleQueue(): Promise<void> {
