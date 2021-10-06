@@ -11,3 +11,8 @@ export interface Event {
     name: string;
     callback: (...args: unknown[]) => void;
 }
+
+export enum AudioSource {
+    Youtube = 'YOUTUBE',
+    Spotify = 'SPOTIFY',
+}

@@ -9,6 +9,7 @@ import {
 import { CommandInteraction, GuildMember } from 'discord.js';
 import { autoInjectable } from 'tsyringe';
 import AudioSubscription from '../audio/AudioSubscription';
+import Track from '../audio/Track';
 import TrackFactory from '../audio/TrackFactory';
 import AudioSubscriptionRepository from '../repositories/AudioSubscriptionRepository';
 
@@ -39,7 +40,7 @@ export default class PlayOperation {
 
         if (!audioSubscription || !audioSubscription.voiceConnection) {
             if (!member.voice.channelId) {
-                this.interaction.reply(`Join a voice channel to use this command`);
+                this.interaction.editReply(`Join a voice channel to use this command`);
                 return;
             }
             const options: JoinVoiceChannelOptions & CreateVoiceConnectionOptions = {
@@ -66,12 +67,15 @@ export default class PlayOperation {
             });
         }
 
-        const track = TrackFactory.createTrack(query);
-
         try {
+            const track = await this.trackFactory.create(query);
+
             await audioSubscription.enqueue(track);
-            await this.interaction.editReply({ content: `${track.title} added to queue` });
+            await this.interaction.editReply({
+                content: `${track instanceof Track ? track.title : 'Playlist'} added to queue`,
+            });
         } catch (err) {
+            console.error(err);
             await this.interaction.editReply({ content: `Unable to add track to queue` });
         }
     }

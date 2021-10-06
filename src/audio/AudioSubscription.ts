@@ -107,10 +107,10 @@ export default class AudioSubscription {
         this.audioPlayer = audioPlayer;
     }
 
-    public async enqueue(track: Track): Promise<void> {
+    public async enqueue(track: Track | Track[]): Promise<void> {
         try {
-            await track.init();
-            this.queue.push(track);
+            await Promise.all([].concat(track).map((t) => t.init()));
+            this.queue = this.queue.concat(track);
             this.handleQueue();
             return new Promise((resolve) => resolve());
         } catch (err) {
@@ -147,7 +147,7 @@ export default class AudioSubscription {
     }
 
     private async updateEmbed(): Promise<void> {
-        //TODO: pull dynamically from a database
+        // TODO: pull dynamically from a database
         const textChannel: TextChannel = this.guild.channels.cache.get(new DingleConfig().channelId) as TextChannel;
         const message: Message = (await textChannel.messages.fetch(new DingleConfig().messageId)) as Message;
         if (this.voiceConnection?.joinConfig?.channelId) {

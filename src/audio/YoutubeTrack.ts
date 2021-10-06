@@ -27,7 +27,7 @@ export default class YoutubeTrack extends Track {
     public async init(): Promise<void> {
         const youtubeService: YoutubeService = container.resolve(YoutubeService);
 
-        if (ytdl.validateURL(this.query)) {
+        if (ytdl.validateID(this.query)) {
             this.videoInfo = await ytdl.getInfo(this.query);
         } else {
             try {

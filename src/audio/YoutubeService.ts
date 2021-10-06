@@ -27,4 +27,19 @@ export default class YoutubeService {
             resolve(response.data.items[0]);
         });
     }
+
+    public async fetchPlaylist(id: string): Promise<youtube_v3.Schema$PlaylistItem[]> {
+        const response = await this.youtube.playlistItems.list({
+            part: ['id', 'snippet'],
+            playlistId: id,
+            maxResults: 50,
+        });
+
+        return new Promise((resolve, reject) => {
+            if (response?.data?.items?.length === 0) {
+                reject(new Error('Unable to find playlist'));
+            }
+            resolve(response.data.items);
+        });
+    }
 }
