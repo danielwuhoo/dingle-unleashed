@@ -6,6 +6,7 @@ import YoutubeTrack from './YoutubeTrack';
 import Track from './Track';
 import { AudioSource } from '../common/types';
 import YoutubeService from './YoutubeService';
+import SpotifyService from './SpotifyService';
 
 @singleton()
 export default class TrackFactory {
@@ -13,11 +14,14 @@ export default class TrackFactory {
 
     private youtubeService: YoutubeService;
 
+    private spotifyService: SpotifyService;
+
     public constructor() {
         this.audioSourceMap = new Map();
         this.audioSourceMap.set('youtube', AudioSource.Youtube);
         this.audioSourceMap.set('spotify', AudioSource.Spotify);
         this.youtubeService = container.resolve(YoutubeService);
+        this.spotifyService = container.resolve(SpotifyService);
     }
 
     public async create(query: string): Promise<Track | Track[]> {
@@ -47,9 +51,15 @@ export default class TrackFactory {
                 }
                 break;
             }
-            // case AudioSource.Spotify:
-            // TODO: Support for creating tracks from spotify links
-            // break;
+            case AudioSource.Spotify: {
+                const id = url.pathname.split('/').pop();
+                const tracks = await this.spotifyService.fetchTracks(id);
+                return tracks.map(
+                    (track) =>
+                        new YoutubeTrack(`${track.name} ${track.artists.map((artist) => artist.name).join(' ')}`),
+                );
+                break;
+            }
             default:
                 return new Promise((_, reject) => reject(new Error('Unsupported url type')));
         }

@@ -77,6 +77,7 @@ export default class PlayOperation {
         } catch (err) {
             console.error(err);
             await this.interaction.editReply({ content: `Unable to add track to queue` });
+            audioSubscription.voiceConnection.destroy();
         }
     }
 }

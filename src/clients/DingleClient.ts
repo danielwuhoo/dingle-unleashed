@@ -8,31 +8,19 @@ import MenuCommandRepository from '../repositories/MenuCommandRepository';
 import AudioSubscriptionRepository from '../repositories/AudioSubscriptionRepository';
 import YoutubeService from '../audio/YoutubeService';
 import ButtonCommandRepository from '../repositories/ButtonCommandRepository';
+import SpotifyService from '../audio/SpotifyService';
 
 @singleton()
 export default class DingleClient extends Client {
-    public config: Config;
-
-    public eventRepository: EventRepository;
-
-    public commandRepository: SlashCommandRepository;
-
-    public menuCommandRepository: MenuCommandRepository;
-
-    public buttonCommandRepository: ButtonCommandRepository;
-
-    public audioSubscriptionRepository: AudioSubscriptionRepository;
-
-    public youtubeService: YoutubeService;
-
     public constructor(
-        @inject(DingleConfig) config: Config,
-        @inject(EventRepository) eventRepository: EventRepository,
-        @inject(SlashCommandRepository) commandRepository: SlashCommandRepository,
-        @inject(MenuCommandRepository) menuCommandRepository: MenuCommandRepository,
-        @inject(ButtonCommandRepository) buttonCommandRepository: ButtonCommandRepository,
-        @inject(AudioSubscriptionRepository) audioSubscriptionRepository: AudioSubscriptionRepository,
-        @inject(YoutubeService) youtubeService: YoutubeService,
+        @inject(DingleConfig) public config: Config,
+        @inject(EventRepository) public eventRepository: EventRepository,
+        @inject(SlashCommandRepository) public commandRepository: SlashCommandRepository,
+        @inject(MenuCommandRepository) public menuCommandRepository: MenuCommandRepository,
+        @inject(ButtonCommandRepository) public buttonCommandRepository: ButtonCommandRepository,
+        @inject(AudioSubscriptionRepository) public audioSubscriptionRepository: AudioSubscriptionRepository,
+        @inject(YoutubeService) public youtubeService: YoutubeService,
+        @inject(SpotifyService) public spotifyService: SpotifyService,
     ) {
         super({
             intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_VOICE_STATES],
@@ -44,6 +32,7 @@ export default class DingleClient extends Client {
         this.buttonCommandRepository = buttonCommandRepository;
         this.audioSubscriptionRepository = audioSubscriptionRepository;
         this.youtubeService = youtubeService;
+        this.spotifyService = spotifyService;
     }
 
     public async init(): Promise<void> {
@@ -53,6 +42,7 @@ export default class DingleClient extends Client {
         await this.eventRepository.init();
         await this.audioSubscriptionRepository.init();
         await this.youtubeService.init();
+        await this.spotifyService.init();
 
         this.eventRepository.events.forEach((event: Event) => this.on(event.name, event.callback));
 
