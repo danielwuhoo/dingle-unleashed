@@ -3,6 +3,7 @@ import { AudioResource, createAudioResource } from '@discordjs/voice';
 import { youtube_v3 } from 'googleapis';
 import { container } from 'tsyringe';
 import ytdl from 'ytdl-core';
+import yts from 'yt-search';
 import Track from './Track';
 import YoutubeService from './YoutubeService';
 
@@ -31,8 +32,10 @@ export default class YoutubeTrack extends Track {
             this.videoInfo = await ytdl.getInfo(this.query);
         } else {
             try {
-                const firstResult: youtube_v3.Schema$SearchResult = await youtubeService.fetchVideo(this.query);
-                this.videoInfo = await ytdl.getInfo(firstResult.id.videoId);
+                const response: yts.SearchResult = await yts(this.query);
+                if (response.videos.length === 0) return new Promise((resolve) => resolve());
+                const firstResult = response.videos[0];
+                this.videoInfo = await ytdl.getInfo(firstResult.videoId);
             } catch (err) {
                 return new Promise((_, reject) => reject(new Error(err)));
             }
