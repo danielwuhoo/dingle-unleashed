@@ -1,11 +1,8 @@
 /* eslint-disable camelcase */
 import { AudioResource, createAudioResource } from '@discordjs/voice';
-import { youtube_v3 } from 'googleapis';
-import { container } from 'tsyringe';
 import ytdl from 'ytdl-core';
 import yts from 'yt-search';
 import Track from './Track';
-import YoutubeService from './YoutubeService';
 
 export default class YoutubeTrack extends Track {
     public videoInfo: ytdl.videoInfo;
@@ -26,8 +23,6 @@ export default class YoutubeTrack extends Track {
     }
 
     public async init(): Promise<void> {
-        const youtubeService: YoutubeService = container.resolve(YoutubeService);
-
         if (ytdl.validateID(this.query)) {
             this.videoInfo = await ytdl.getInfo(this.query);
         } else {
