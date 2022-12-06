@@ -7,6 +7,7 @@ import {
     VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { error } from 'console';
+import { ActivityType } from 'discord-api-types/v10';
 import {
     EmbedFieldData,
     Guild,
