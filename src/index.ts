@@ -4,6 +4,8 @@ import 'reflect-metadata';
 import { container } from 'tsyringe';
 import dotenv from 'dotenv';
 import express from 'express';
+import cron from 'node-cron';
+import fetch from 'node-fetch';
 import Client from './clients/DingleClient';
 
 dotenv.config();
@@ -19,4 +21,8 @@ app.get('/', (req, res) => {
 
 app.listen(port, () => {
     console.log('Express server listening on port 3000');
+});
+
+cron.schedule('*/10 * * * *', () => {
+    fetch('https://dingle-unleashed.onrender.com');
 });
