@@ -10,12 +10,13 @@ dotenv.config();
 
 const client: Client = container.resolve(Client);
 const app = express();
+const port = process.env.PORT || 3001;
 client.init();
 
 app.get('/', (req, res) => {
     res.send('Hello from Express server!');
 });
 
-app.listen(3000, () => {
+app.listen(port, () => {
     console.log('Express server listening on port 3000');
 });
