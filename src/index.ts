@@ -5,7 +5,7 @@ import { container } from 'tsyringe';
 import dotenv from 'dotenv';
 import express from 'express';
 import cron from 'node-cron';
-import fetch from 'node-fetch';
+import fetch from 'node-fetch-commonjs';
 import Client from './clients/DingleClient';
 
 dotenv.config();

@@ -33,7 +33,7 @@
     "libsodium-wrappers": "^0.7.9",
     "mongoose": "^6.0.5",
     "node-cron": "^3.0.2",
-    "node-fetch": "^3.3.0",
+    "node-fetch-commonjs": "^3.2.4",
     "parse-domain": "^4.1.0",
     "reflect-metadata": "^0.1.13",
     "regenerator-runtime": "^0.13.9",
