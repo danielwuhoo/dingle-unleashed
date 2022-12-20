@@ -1,7 +1,7 @@
 import { readdir } from 'fs/promises';
 import { singleton } from 'tsyringe';
-import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/v9';
+import { REST } from 'discord.js';
 import { Config } from '../common/types';
 import SlashCommand from '../interactions/SlashCommand';
 

@@ -17,15 +17,13 @@
   "author": "danielwuhoo <danielwuhoo@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@discordjs/builders": "^0.6.0",
     "@discordjs/opus": "^0.6.0",
-    "@discordjs/rest": "^0.1.0-canary.0",
-    "@discordjs/voice": "^0.6.0",
+    "@discordjs/voice": "^0.14.0",
     "@types/spotify-web-api-node": "^5.0.3",
     "@types/yt-search": "^2.3.2",
     "core-js": "^3.18.1",
     "discord-api-types": "^0.37.21",
-    "discord.js": "^13.1.0",
+    "discord.js": "^14.7.1",
     "dotenv": "^10.0.0",
     "express": "^4.18.2",
     "ffmpeg-static": "^4.4.0",
@@ -39,7 +37,6 @@
     "regenerator-runtime": "^0.13.9",
     "spotify-web-api-node": "^5.0.2",
     "tsyringe": "^4.6.0",
-    "typescript": "^4.4.3",
     "yt-search": "^2.10.1",
     "ytdl-core": "https://github.com/GreepTheSheep/node-ytdl-core.git"
   },
@@ -62,7 +59,8 @@
     "eslint-plugin-prettier": "^4.0.0",
     "prettier": "^2.4.1",
     "ts-node": "^10.2.1",
-    "ts-node-dev": "^1.1.8"
+    "ts-node-dev": "^1.1.8",
+    "typescript": "^4.9.4"
   },
   "engines": {
     "node": "=16.x"

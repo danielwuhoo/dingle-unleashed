@@ -1,10 +1,9 @@
-import { SlashCommandBuilder } from '@discordjs/builders';
-import { CommandInteraction } from 'discord.js';
+import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 
 export default abstract class SlashCommand extends SlashCommandBuilder {
-    interaction: CommandInteraction;
+    interaction: ChatInputCommandInteraction;
 
-    setInteraction(interaction: CommandInteraction): SlashCommand {
+    setInteraction(interaction: ChatInputCommandInteraction): SlashCommand {
         this.interaction = interaction;
         return this;
     }

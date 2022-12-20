@@ -6,7 +6,7 @@ import {
     JoinVoiceChannelOptions,
     VoiceConnectionStatus,
 } from '@discordjs/voice';
-import { CommandInteraction, GuildMember } from 'discord.js';
+import { ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import { autoInjectable } from 'tsyringe';
 import AudioSubscription from '../audio/AudioSubscription';
 import Track from '../audio/Track';
@@ -15,14 +15,14 @@ import AudioSubscriptionRepository from '../repositories/AudioSubscriptionReposi
 
 @autoInjectable()
 export default class PlayOperation {
-    readonly interaction: CommandInteraction;
+    readonly interaction: ChatInputCommandInteraction;
 
     readonly audioSubscriptionRepository: AudioSubscriptionRepository;
 
     readonly trackFactory: TrackFactory;
 
     public constructor(
-        interaction: CommandInteraction,
+        interaction: ChatInputCommandInteraction,
         audioSubscriptionRepository?: AudioSubscriptionRepository,
         trackFactory?: TrackFactory,
     ) {

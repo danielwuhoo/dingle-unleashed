@@ -1,24 +1,27 @@
 import {
-    BaseCommandInteraction,
+    CommandInteraction,
     ButtonInteraction,
-    ContextMenuInteraction,
+    ContextMenuCommandInteraction,
     GuildMember,
     InteractionCollector,
     InteractionReplyOptions,
     Message,
-    MessageActionRow,
-    MessageButton,
-    MessageComponentCollectorOptions,
-    MessageEmbed,
+    ActionRowBuilder,
+    ButtonBuilder,
+    EmbedBuilder,
     VoiceChannel,
+    ButtonStyle,
+    APIButtonComponentWithCustomId,
+    ComponentType,
+    MessageChannelCollectorOptionsParams,
 } from 'discord.js';
 
 export default class VoteKickOperation {
-    interaction: BaseCommandInteraction;
+    interaction: CommandInteraction;
 
     userId: string;
 
-    public constructor(interaction: ContextMenuInteraction) {
+    public constructor(interaction: ContextMenuCommandInteraction) {
         this.interaction = interaction;
         this.userId = interaction.targetId;
     }
@@ -34,9 +37,14 @@ export default class VoteKickOperation {
 
         const votesNeeded: number = Math.max(3, Math.ceil(voiceChannel.members.size / 2));
         const votes: Set<GuildMember> = new Set();
-        const kickButton: MessageButton = new MessageButton().setCustomId('kick').setLabel('Kick').setStyle('DANGER');
-        const actionRow: MessageActionRow = new MessageActionRow().addComponents(kickButton);
-        const embed: MessageEmbed = new MessageEmbed()
+        const kickButton: ButtonBuilder = new ButtonBuilder()
+            .setCustomId('kick')
+            .setLabel('Kick')
+            .setStyle(ButtonStyle.Danger);
+        const actionRow: ActionRowBuilder<ButtonBuilder> = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            kickButton,
+        );
+        const embed: EmbedBuilder = new EmbedBuilder()
             .setTitle('Vote Kick')
             .setDescription(`<@${member.id}>`)
             .setThumbnail(member.user.displayAvatarURL())
@@ -58,13 +66,15 @@ export default class VoteKickOperation {
         };
         const message: Message = (await this.interaction.reply({ ...replyOptions, fetchReply: true })) as Message;
 
-        const options: MessageComponentCollectorOptions<ButtonInteraction> = {
+        const options: MessageChannelCollectorOptionsParams<ComponentType.Button> = {
             time: 20000,
-            filter: (i: ButtonInteraction) => i.message === message && i.customId === kickButton.customId,
+            filter: (i: ButtonInteraction) =>
+                i.message.id === message.id &&
+                i.customId === (kickButton.data as APIButtonComponentWithCustomId).custom_id,
         };
 
         const collector: InteractionCollector<ButtonInteraction> =
-            this.interaction.channel.createMessageComponentCollector(options);
+            this.interaction.channel.createMessageComponentCollector<ComponentType.Button>(options);
         collector.on('collect', async (i: ButtonInteraction) => {
             if (votes.has(i.member as GuildMember)) {
                 i.reply({ content: 'You voted already you dingus', ephemeral: true });

@@ -1,4 +1,4 @@
-import { Client, Intents } from 'discord.js';
+import { Client, GatewayIntentBits } from 'discord.js';
 import { inject, singleton } from 'tsyringe';
 import { Config, Event } from '../common/types';
 import SlashCommandRepository from '../repositories/SlashCommandRepository';
@@ -23,7 +23,12 @@ export default class DingleClient extends Client {
         @inject(SpotifyService) public spotifyService: SpotifyService,
     ) {
         super({
-            intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_VOICE_STATES],
+            intents: [
+                GatewayIntentBits.Guilds,
+                GatewayIntentBits.GuildMessages,
+                GatewayIntentBits.MessageContent,
+                GatewayIntentBits.GuildVoiceStates,
+            ],
         });
         this.config = config;
         this.eventRepository = eventRepository;

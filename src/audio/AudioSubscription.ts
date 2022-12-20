@@ -7,16 +7,16 @@ import {
     VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { error } from 'console';
-import { ActivityType } from 'discord-api-types/v10';
 import {
-    EmbedFieldData,
+    EmbedField,
     Guild,
     Message,
-    MessageActionRow,
-    MessageButton,
-    MessageEmbed,
+    ActionRowBuilder,
+    ButtonBuilder,
+    EmbedBuilder,
     TextChannel,
     VoiceChannel,
+    ButtonStyle,
 } from 'discord.js';
 import { promisify } from 'util';
 import DingleConfig from '../models/DingleConfig';
@@ -31,9 +31,9 @@ export default class AudioSubscription {
 
     public queue: Track[];
 
-    public embed: MessageEmbed;
+    public embed: EmbedBuilder;
 
-    public actionRow: MessageActionRow;
+    public actionRow: ActionRowBuilder<ButtonBuilder>;
 
     public readyLock: boolean;
 
@@ -44,7 +44,7 @@ export default class AudioSubscription {
         this.queue = [];
         this.readyLock = false;
         this.queueLock = false;
-        this.embed = new MessageEmbed().setColor('#11f0b1');
+        this.embed = new EmbedBuilder().setColor('#11f0b1');
         this.actionRow = null;
 
         voiceConnection.on('stateChange', async (_, newState) => {
@@ -139,7 +139,7 @@ export default class AudioSubscription {
         return this.audioPlayer.stop(true);
     }
 
-    public getEmbed(): MessageEmbed {
+    public getEmbed(): EmbedBuilder {
         return this.embed;
     }
 
@@ -155,9 +155,9 @@ export default class AudioSubscription {
             const voiceChannel: VoiceChannel = this.guild.channels.cache.get(
                 this.voiceConnection.joinConfig.channelId,
             ) as VoiceChannel;
-            this.embed.setAuthor(`Connected to: ${voiceChannel.name}`);
+            this.embed.setAuthor({ name: `Connected to: ${voiceChannel.name}` });
         } else {
-            this.embed.setAuthor(`Not connected to a channel`);
+            this.embed.setAuthor({ name: `Not connected to a channel` });
         }
 
         if (this.queue.length > 0) {
@@ -174,7 +174,7 @@ export default class AudioSubscription {
             }
         } else {
             this.embed.setDescription('The queue is empty, use `/play` to add to the queue');
-            this.embed.setThumbnail('');
+            this.embed.setThumbnail(null);
             this.embed.setFields([]);
         }
         message.edit({ embeds: [this.embed] });
@@ -185,13 +185,13 @@ export default class AudioSubscription {
         const message: Message = (await textChannel.messages.fetch(new DingleConfig().messageId)) as Message;
         this.actionRow = null;
         if (this.voiceConnection) {
-            this.actionRow = new MessageActionRow().addComponents(
-                new MessageButton()
+            this.actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder()
                     .setCustomId('togglePause')
                     .setLabel(this.audioPlayer.state.status === AudioPlayerStatus.Paused ? 'Unpause' : 'Pause')
-                    .setStyle('PRIMARY'),
-                new MessageButton().setCustomId('skip').setLabel('Skip').setStyle('PRIMARY'),
-                new MessageButton().setCustomId('stop').setLabel('Stop').setStyle('DANGER'),
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('skip').setLabel('Skip').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('stop').setLabel('Stop').setStyle(ButtonStyle.Danger),
             );
         }
         message.edit({ components: this.actionRow ? [this.actionRow] : [] });
@@ -229,10 +229,11 @@ export default class AudioSubscription {
         return `${h > 0 ? `${h}h` : ''}${m}m${s}s`;
     }
 
-    private static trackToField(track: Track, index: number): EmbedFieldData {
+    private static trackToField(track: Track, index: number): EmbedField {
         return {
             name: `${index + 2}. ${track.title}`,
             value: `Duration: ${AudioSubscription.secondsToHms(track.duration)}`,
+            inline: false,
         };
     }
 }

@@ -1,4 +1,4 @@
-import { SlashCommandStringOption } from '@discordjs/builders';
+import { SlashCommandStringOption } from 'discord.js';
 import { autoInjectable } from 'tsyringe';
 import PlayOperation from '../../operations/PlayOperation';
 import SlashCommand from '../SlashCommand';
