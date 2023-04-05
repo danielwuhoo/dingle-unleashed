@@ -110,6 +110,7 @@ export default class AudioSubscription {
 
     public async enqueue(track: Track | Track[]): Promise<void> {
         try {
+            //TODO: resolve first track and then process the rest
             await Promise.all([].concat(track).map((t) => t.init()));
             this.queue = this.queue.concat(track);
             this.handleQueue();
@@ -170,7 +171,7 @@ export default class AudioSubscription {
                     )}`,
                 );
                 this.embed.setThumbnail(this.queue[0].thumbnailUrl);
-                this.embed.setFields(this.queue.slice(1).map(AudioSubscription.trackToField));
+                this.embed.setFields(this.queue.slice(1, 25).map(AudioSubscription.trackToField));
             }
         } else {
             this.embed.setDescription('The queue is empty, use `/play` to add to the queue');

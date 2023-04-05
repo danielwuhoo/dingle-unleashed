@@ -1,7 +1,8 @@
+/* eslint-disable camelcase */
 import { container, singleton } from 'tsyringe';
 import { URL } from 'url';
 import { parseDomain, ParseResultListed } from 'parse-domain';
-import ytdl from 'ytdl-core';
+import { yt_validate } from 'play-dl';
 import YoutubeTrack from './YoutubeTrack';
 import Track from './Track';
 import { AudioSource } from '../common/types';
@@ -37,7 +38,7 @@ export default class TrackFactory {
         switch (this.audioSourceMap.get(result.domain)) {
             case AudioSource.Youtube: {
                 const v = url.searchParams.get('v');
-                if (v && ytdl.validateID(v)) {
+                if (v && yt_validate(v)) {
                     return new YoutubeTrack(v);
                 }
                 const list = url.searchParams.get('list');
