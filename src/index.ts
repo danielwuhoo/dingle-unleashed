@@ -9,3 +9,11 @@ dotenv.config();
 
 const client: Client = container.resolve(Client);
 client.init();
+
+process.on('uncaughtException', (e) => {
+    console.error(e);
+    console.error(e.stack);
+    console.log('Process will restart now.');
+    client.destroy();
+    process.exit(1);
+});
