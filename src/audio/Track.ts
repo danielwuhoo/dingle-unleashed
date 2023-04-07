@@ -9,6 +9,8 @@ export default abstract class Track {
 
     public duration: number;
 
+    public isInitialized: boolean;
+
     readonly onStart: () => void;
 
     readonly onFinish: () => void;

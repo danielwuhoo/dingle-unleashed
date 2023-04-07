@@ -39,6 +39,8 @@ export default class AudioSubscription {
 
     public queueLock: boolean;
 
+    public queueDisplayLimit: number;
+
     public constructor(voiceConnection: VoiceConnection, audioPlayer: AudioPlayer, guild: Guild) {
         this.guild = guild;
         this.queue = [];
@@ -46,6 +48,7 @@ export default class AudioSubscription {
         this.queueLock = false;
         this.embed = new EmbedBuilder().setColor('#11f0b1');
         this.actionRow = null;
+        this.queueDisplayLimit = 10;
 
         voiceConnection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -110,10 +113,8 @@ export default class AudioSubscription {
 
     public async enqueue(track: Track | Track[]): Promise<void> {
         try {
-            //TODO: resolve first track and then process the rest
-            await Promise.all([].concat(track).map((t) => t.init()));
             this.queue = this.queue.concat(track);
-            this.handleQueue();
+            await this.handleQueue();
             return new Promise((resolve) => resolve());
         } catch (err) {
             console.error(error);
@@ -161,18 +162,16 @@ export default class AudioSubscription {
             this.embed.setAuthor({ name: `Not connected to a channel` });
         }
 
-        if (this.queue.length > 0) {
-            if (this.audioPlayer.state.status === AudioPlayerStatus.Playing) {
-                this.embed.setFields(this.queue.map(AudioSubscription.trackToField));
-            } else {
+        if (this.queue.length) {
+            if (this.audioPlayer.state.status !== AudioPlayerStatus.Playing) {
                 this.embed.setDescription(
                     `***Currently playing:*** **${this.queue[0].title}**\nDuration: ${AudioSubscription.secondsToHms(
                         this.queue[0].duration,
                     )}`,
                 );
                 this.embed.setThumbnail(this.queue[0].thumbnailUrl);
-                this.embed.setFields(this.queue.slice(1, 25).map(AudioSubscription.trackToField));
             }
+            this.embed.setFields(this.queue.slice(1, this.queueDisplayLimit).map(AudioSubscription.trackToField));
         } else {
             this.embed.setDescription('The queue is empty, use `/play` to add to the queue');
             this.embed.setThumbnail(null);
@@ -199,13 +198,20 @@ export default class AudioSubscription {
     }
 
     private async handleQueue(): Promise<void> {
+        await Promise.all(
+            this.queue
+                .slice(0, this.queueDisplayLimit)
+                .filter(({ isInitialized }) => !isInitialized)
+                .map((t) => t.init()),
+        );
         await this.updateEmbed();
         if (this.queue.length === 0) {
             this.voiceConnection.disconnect();
-            return;
+            return new Promise((_, reject) => reject());
         }
 
-        if (this.queueLock || this.audioPlayer.state.status !== AudioPlayerStatus.Idle) return;
+        if (this.queueLock || this.audioPlayer.state.status !== AudioPlayerStatus.Idle)
+            return new Promise((resolve) => resolve());
 
         this.queueLock = true;
 
@@ -220,6 +226,7 @@ export default class AudioSubscription {
         } finally {
             this.queueLock = false;
         }
+        return new Promise((resolve) => resolve());
     }
 
     private static secondsToHms(d: number): string {
