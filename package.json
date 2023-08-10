@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts",
     "check-types": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --trace-warnings dist/index.js",
     "format": "prettier --write src/**/*.{js,jsx,ts,tsx}",
     "lint": "eslint --fix src/**/*.{js,jsx,ts,tsx}",
     "babel": "babel src --out-dir dist --extensions \".ts\" --source-maps inline",
