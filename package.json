@@ -5,14 +5,14 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts",
     "check-types": "tsc",
-    "start": "node --trace-warnings dist/index.js",
+    "start": "node --trace-warnings --es-module-specifier-resolution=node dist/index.js",
     "format": "prettier --write src/**/*.{js,jsx,ts,tsx}",
     "lint": "eslint --fix src/**/*.{js,jsx,ts,tsx}",
     "babel": "babel src --out-dir dist --extensions \".ts\" --source-maps inline",
     "build": "yarn run check-types && yarn run babel",
     "export-vars": "heroku config -s >> .env"
   },
-  "type": "commonjs",
+  "type": "module",
   "repository": "git@github.com:danielwuhoo/dingle-unleashed.git",
   "author": "danielwuhoo <danielwuhoo@gmail.com>",
   "license": "MIT",

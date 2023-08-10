@@ -1,5 +1,7 @@
 import { readdir } from 'fs/promises';
+import { dirname } from 'path';
 import { singleton } from 'tsyringe';
+import { fileURLToPath } from 'url';
 import ButtonCommand from '../interactions/ButtonCommand';
 
 @singleton()
@@ -12,7 +14,9 @@ export default class ButtonCommandRepository {
 
     public async init(): Promise<void> {
         try {
-            const files: string[] = await readdir(`${__dirname}/../interactions/buttonCommands`);
+            const files: string[] = await readdir(
+                `${dirname(fileURLToPath(import.meta.url))}/../interactions/buttonCommands`,
+            );
             this.commands = (await Promise.all(files.map((file) => import(`../interactions/buttonCommands/${file}`))))
                 .map((command) => command.default)
                 .reduce((commands, command) => {

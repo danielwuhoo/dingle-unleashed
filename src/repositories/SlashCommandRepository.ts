@@ -1,7 +1,9 @@
-import { readdir } from 'fs/promises';
-import { singleton } from 'tsyringe';
 import { Routes } from 'discord-api-types/v9';
 import { REST } from 'discord.js';
+import { readdir } from 'fs/promises';
+import { dirname } from 'path';
+import { singleton } from 'tsyringe';
+import { fileURLToPath } from 'url';
 import { Config } from '../common/types';
 import SlashCommand from '../interactions/SlashCommand';
 
@@ -15,7 +17,9 @@ export default class SlashCommandRepository {
 
     public async init(): Promise<void> {
         try {
-            const files: string[] = await readdir(`${__dirname}/../interactions/slashCommands`);
+            const files: string[] = await readdir(
+                `${dirname(fileURLToPath(import.meta.url))}/../interactions/slashCommands`,
+            );
             this.commands = (await Promise.all(files.map((file) => import(`../interactions/slashCommands/${file}`))))
                 .map((command) => command.default)
                 .reduce((commands, command) => {

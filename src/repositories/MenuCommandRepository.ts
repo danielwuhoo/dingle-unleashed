@@ -1,5 +1,7 @@
 import { readdir } from 'fs/promises';
+import { dirname } from 'path';
 import { singleton } from 'tsyringe';
+import { fileURLToPath } from 'url';
 import MenuCommand from '../interactions/MenuCommand';
 
 @singleton()
@@ -12,7 +14,9 @@ export default class MenuCommandRepository {
 
     public async init(): Promise<void> {
         try {
-            const files: string[] = await readdir(`${__dirname}/../interactions/menuCommands`);
+            const files: string[] = await readdir(
+                `${dirname(fileURLToPath(import.meta.url))}/../interactions/menuCommands`,
+            );
             this.commands = (await Promise.all(files.map((file) => import(`../interactions/menuCommands/${file}`))))
                 .map((command) => command.default)
                 .reduce((commands, command) => {
