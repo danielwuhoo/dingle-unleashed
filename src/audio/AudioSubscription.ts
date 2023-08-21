@@ -90,15 +90,20 @@ export default class AudioSubscription {
             }
         });
 
-        audioPlayer.on('stateChange', (oldState, newState) => {
+        audioPlayer.on('stateChange', async (oldState, newState) => {
             if (newState.status === AudioPlayerStatus.Paused || newState.status === AudioPlayerStatus.Playing) {
-                this.updateActionRow();
+                await this.updateActionRow();
             }
             if (newState.status === AudioPlayerStatus.Idle && oldState.status !== AudioPlayerStatus.Idle) {
                 // If the Idle state is entered from a non-Idle state, it means that an audio resource has finished playing.
                 // The queue is then processed to start playing the next track, if one is available.
                 // (oldState.resource as AudioResource<Track>).metadata.onFinish();
-                this.handleQueue();
+                try {
+                    this.queue.shift();
+                    await this.handleQueue();
+                } catch (err) {
+                    await this.updateEmbed();
+                }
             } else if (newState.status === AudioPlayerStatus.Playing) {
                 // If the Playing state has been entered, then a new track has started playback.
                 // (newState.resource as AudioResource<Track>).metadata.onStart();
@@ -207,7 +212,7 @@ export default class AudioSubscription {
         await this.updateEmbed();
         if (this.queue.length === 0) {
             this.voiceConnection.disconnect();
-            return new Promise((_, reject) => reject());
+            return new Promise((_, reject) => reject(new Error('No songs in queue')));
         }
 
         if (this.queueLock || this.audioPlayer.state.status !== AudioPlayerStatus.Idle)
@@ -215,7 +220,7 @@ export default class AudioSubscription {
 
         this.queueLock = true;
 
-        const nextTrack: Track = this.queue.shift();
+        const nextTrack: Track = this.queue[0];
 
         try {
             const resource = await nextTrack.createAudioResource();
