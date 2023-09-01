@@ -1,4 +1,5 @@
-import { Message } from 'discord.js';
+import { Message, PermissionsBitField } from 'discord.js';
+import DingleConfig from '../models/DingleConfig.js';
 
 export default class EchoMessageOperation {
     readonly message: Message;
@@ -11,6 +12,12 @@ export default class EchoMessageOperation {
     }
 
     public async run(): Promise<void> {
+        const { channelId } = new DingleConfig();
+
+        if (this.message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+
+        if (this.message.channelId === channelId) return;
+
         if (this.message.author.bot) return;
 
         if (this.message.content === this.newMessage?.content) return;
