@@ -5,7 +5,7 @@ import EchoMessageOperation from '../operations/EchoMessageOperation';
 const MessageDeleteEvent: Event = {
     name: 'messageDelete',
     callback: (message: Message) => {
-        new EchoMessageOperation(message).run();
+        if (!message.member.permissions.has('ManageMessages')) new EchoMessageOperation(message).run();
     },
 };
 
