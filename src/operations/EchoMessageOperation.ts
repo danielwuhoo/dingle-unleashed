@@ -25,7 +25,8 @@ export default class EchoMessageOperation {
         const embed = new EmbedBuilder()
             .setColor(this.message.member.displayHexColor)
             .setAuthor({ name: `<@${this.message.author.id}>`, iconURL: this.message.member.displayAvatarURL() })
-            .setDescription(`${this.message.content}`);
+            .setDescription(`${this.message.content}`)
+            .setTimestamp(this.message.createdTimestamp);
 
         await this.message.channel.send({
             embeds: [embed],
