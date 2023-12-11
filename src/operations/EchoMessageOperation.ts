@@ -24,7 +24,7 @@ export default class EchoMessageOperation {
 
         const embed = new EmbedBuilder()
             .setColor(this.message.member.displayHexColor)
-            .setAuthor({ name: `<@${this.message.author.id}>`, iconURL: this.message.member.displayAvatarURL() })
+            .setAuthor({ name: `${this.message.member}`, iconURL: this.message.member.displayAvatarURL() })
             .setDescription(`${this.message.content}`)
             .setTimestamp(this.message.createdTimestamp);
 
