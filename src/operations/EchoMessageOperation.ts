@@ -24,8 +24,8 @@ export default class EchoMessageOperation {
 
         const embed = new EmbedBuilder()
             .setColor(this.message.member.displayHexColor)
-            .setAuthor({ name: `${this.message.member}`, iconURL: this.message.member.displayAvatarURL() })
-            .setDescription(`${this.message.content}`)
+            .setAuthor({ name: 'Message deleted', iconURL: this.message.member.displayAvatarURL() })
+            .setDescription(`<@${this.message.author.id}>\n ${this.message.content}`)
             .setTimestamp(this.message.createdTimestamp);
 
         await this.message.channel.send({
