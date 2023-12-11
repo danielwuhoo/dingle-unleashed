@@ -1,4 +1,4 @@
-import { Message, PermissionsBitField } from 'discord.js';
+import { EmbedBuilder, Message, PermissionsBitField } from 'discord.js';
 import DingleConfig from '../models/DingleConfig.js';
 
 export default class EchoMessageOperation {
@@ -22,8 +22,13 @@ export default class EchoMessageOperation {
 
         if (this.message.content === this.newMessage?.content) return;
 
+        const embed = new EmbedBuilder()
+            .setColor(this.message.member.displayHexColor)
+            .setAuthor({ name: `<@${this.message.author.id}>`, iconURL: this.message.member.displayAvatarURL() })
+            .setDescription(`${this.message.content}`);
+
         await this.message.channel.send({
-            content: `${this.message.content}\n <@${this.message.author.id}>`,
+            embeds: [embed],
             files: [...this.message.attachments.values()],
         });
     }
