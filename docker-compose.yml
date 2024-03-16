@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  dingle-unleashed:
+    image: danielwuhoo/dingle-unleashed:master
+    container_name: dingle-unleashed
+    env_file: .env
+    restart: always
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -i 60
+    restart: always
