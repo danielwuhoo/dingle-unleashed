@@ -14,7 +14,7 @@ export default class EchoMessageOperation {
     public async run(): Promise<void> {
         const { channelId } = new DingleConfig();
 
-        if (this.message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+        if (this.message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
         if (this.message.channelId === channelId) return;
 
