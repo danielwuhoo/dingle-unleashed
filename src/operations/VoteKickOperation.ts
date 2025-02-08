@@ -19,15 +19,13 @@ import {
 export default class VoteKickOperation {
     interaction: CommandInteraction;
 
-    userId: string;
-
     public constructor(interaction: ContextMenuCommandInteraction) {
         this.interaction = interaction;
-        this.userId = interaction.targetId;
     }
 
     public async run(): Promise<void> {
-        const member: GuildMember = this.interaction.guild.members.cache.get(this.userId);
+        if (!this.interaction.isUserContextMenuCommand()) return;
+        const member: GuildMember = this.interaction.targetMember as GuildMember;
         const voiceChannel: VoiceChannel = member.voice.channel as VoiceChannel;
 
         if (!voiceChannel) {

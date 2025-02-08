@@ -1,4 +1,4 @@
-import { EmbedBuilder, Message, PermissionsBitField } from 'discord.js';
+import { EmbedBuilder, GuildTextBasedChannel, Message, PermissionsBitField } from 'discord.js';
 import DingleConfig from '../models/DingleConfig.js';
 
 export default class EchoMessageOperation {
@@ -28,7 +28,7 @@ export default class EchoMessageOperation {
             .setDescription(`<@${this.message.author.id}>\n ${this.message.content}`)
             .setTimestamp(this.message.createdTimestamp);
 
-        await this.message.channel.send({
+        await (this.message.channel as GuildTextBasedChannel).send({
             embeds: [embed],
             files: [...this.message.attachments.values()],
         });

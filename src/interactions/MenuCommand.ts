@@ -1,14 +1,8 @@
-import { ContextMenuCommandInteraction } from 'discord.js';
+import { ContextMenuCommandBuilder, ContextMenuCommandInteraction } from 'discord.js';
 
-export default abstract class MenuCommand {
-    name: string;
+export default abstract class MenuCommand extends ContextMenuCommandBuilder {
 
     interaction: ContextMenuCommandInteraction;
-
-    setName(name: string): MenuCommand {
-        this.name = name;
-        return this;
-    }
 
     setInteraction(interaction: ContextMenuCommandInteraction): MenuCommand {
         this.interaction = interaction;

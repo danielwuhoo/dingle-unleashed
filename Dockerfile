@@ -1,4 +1,4 @@
-FROM node:16.18.0
+FROM node:22.12.0
 RUN mkdir -p /opt/app
 WORKDIR /opt/app
 COPY package.json yarn.lock ./
