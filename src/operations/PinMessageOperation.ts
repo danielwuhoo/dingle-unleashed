@@ -1,4 +1,4 @@
-import { CommandInteraction, ContextMenuCommandInteraction } from 'discord.js';
+import { CommandInteraction, ContextMenuCommandInteraction, MessageFlags } from 'discord.js';
 
 export default class PinMessageOperation {
     interaction: CommandInteraction;
@@ -11,5 +11,9 @@ export default class PinMessageOperation {
         if (!this.interaction.isMessageContextMenuCommand()) return;
 
         this.interaction.targetMessage.pin();
+        this.interaction.reply({
+            content: 'Message pinned',
+            flags: MessageFlags.Ephemeral,
+        });
     }
 }
