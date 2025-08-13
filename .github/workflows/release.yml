@@ -47,4 +47,4 @@ jobs:
             docker pull danielwuhoo/dingle-unleashed:master
             docker stop dingle-unleashed || true
             docker rm dingle-unleashed || true
-            docker run -d --restart unless-stopped --name dingle-unleashed danielwuhoo/dingle-unleashed:master
+            docker run -d --restart unless-stopped --name dingle-unleashed --env-file dingle-unleashed/.env danielwuhoo/dingle-unleashed:master
