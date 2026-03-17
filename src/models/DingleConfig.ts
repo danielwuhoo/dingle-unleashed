@@ -19,6 +19,8 @@ export default class DingleConfig implements Config {
 
     messageId: string;
 
+    wordleChannelId: string;
+
     public constructor() {
         this.token = process.env.TOKEN;
         this.googleAPIKey = process.env.GOOGLE_API_KEY;
@@ -28,5 +30,6 @@ export default class DingleConfig implements Config {
         this.guildId = process.env.GUILD_ID;
         this.channelId = process.env.CHANNEL_ID;
         this.messageId = process.env.MESSAGE_ID;
+        this.wordleChannelId = process.env.WORDLE_CHANNEL_ID;
     }
 }

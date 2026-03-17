@@ -7,6 +7,7 @@ export interface Config {
     guildId: string;
     channelId: string;
     messageId: string;
+    wordleChannelId: string;
 }
 
 export interface Event {

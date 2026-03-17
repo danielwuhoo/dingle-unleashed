@@ -9,6 +9,7 @@ import AudioSubscriptionRepository from '../repositories/AudioSubscriptionReposi
 import YoutubeService from '../audio/YoutubeService';
 import ButtonCommandRepository from '../repositories/ButtonCommandRepository';
 import SpotifyService from '../audio/SpotifyService';
+import DatabaseService from '../database/DatabaseService';
 
 @singleton()
 export default class DingleClient extends Client {
@@ -21,6 +22,7 @@ export default class DingleClient extends Client {
         @inject(AudioSubscriptionRepository) public audioSubscriptionRepository: AudioSubscriptionRepository,
         @inject(YoutubeService) public youtubeService: YoutubeService,
         @inject(SpotifyService) public spotifyService: SpotifyService,
+        @inject(DatabaseService) public databaseService: DatabaseService,
     ) {
         super({
             intents: [
@@ -38,9 +40,11 @@ export default class DingleClient extends Client {
         this.audioSubscriptionRepository = audioSubscriptionRepository;
         this.youtubeService = youtubeService;
         this.spotifyService = spotifyService;
+        this.databaseService = databaseService;
     }
 
     public async init(): Promise<void> {
+        this.databaseService.init();
         await this.commandRepository.init();
         await this.menuCommandRepository.init();
         await this.buttonCommandRepository.init();

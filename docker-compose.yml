@@ -6,6 +6,8 @@ services:
     container_name: dingle-unleashed
     env_file: .env
     restart: always
+    volumes:
+      - sqlite-data:/opt/app/data
 
   watchtower:
     image: containrrr/watchtower
@@ -14,3 +16,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: -i 60
     restart: always
+
+volumes:
+  sqlite-data:
