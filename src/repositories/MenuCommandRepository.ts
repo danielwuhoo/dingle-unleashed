@@ -3,7 +3,7 @@ import { singleton } from 'tsyringe';
 import { Routes } from 'discord-api-types/v9';
 import { REST } from 'discord.js';
 import { Config } from '../common/types';
-import MenuCommand from '../interactions/MenuCommand.js';
+import MenuCommand from '../interactions/MenuCommand';
 
 @singleton()
 export default class MenuCommandRepository {

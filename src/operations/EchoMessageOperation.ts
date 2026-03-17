@@ -1,5 +1,5 @@
 import { EmbedBuilder, GuildTextBasedChannel, Message, PermissionsBitField } from 'discord.js';
-import DingleConfig from '../models/DingleConfig.js';
+import DingleConfig from '../models/DingleConfig';
 
 export default class EchoMessageOperation {
     readonly message: Message;

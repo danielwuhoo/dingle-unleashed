@@ -18,7 +18,7 @@ function normalizeString(str: string): string {
     return str
         .normalize('NFKD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^\w\s]/g, '')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
         .toLowerCase()
         .trim();
 }
@@ -52,15 +52,10 @@ function findMember(name: string, members: Collection<string, GuildMember>): Gui
     );
     if (found) return found;
 
-    // startsWith / includes for truncated names
+    // startsWith for truncated names
     if (normalizedName.length >= 3) {
         found = members.find(
             (m) => normalizeString(m.displayName).startsWith(normalizedName),
-        );
-        if (found) return found;
-
-        found = members.find(
-            (m) => normalizeString(m.displayName).includes(normalizedName),
         );
         if (found) return found;
     }
@@ -79,18 +74,42 @@ export function parseWordleSummary(
     const lines = content.split('\n');
     const scoreRegex = /(?:👑\s*)?([1-6X])\/6:\s*(.+)/;
 
+    const mentionRegex = /<@!?(\d+)>/g;
+    const nameRegex = /@(.+?)(?=\s*@|$)/g;
+
     for (const line of lines) {
         const match = line.match(scoreRegex);
         if (!match) continue;
 
         const guessStr = match[1];
         const guesses = guessStr === 'X' ? 7 : parseInt(guessStr, 10);
-        const namesSection = match[2];
+        let namesSection = match[2];
 
-        // Split on @ to get individual names, filtering empty strings
-        const names = namesSection.split('@').filter((n) => n.trim().length > 0);
+        // Step 1: Extract Discord mentions before splitting
+        let mentionMatch;
+        while ((mentionMatch = mentionRegex.exec(namesSection)) !== null) {
+            const userId = mentionMatch[1];
+            const member = members.get(userId);
+            if (member) {
+                results.push({
+                    userId: member.id,
+                    username: member.displayName,
+                    guesses,
+                });
+            } else {
+                console.warn(`[WordleParser] Could not resolve mention: <@${userId}>`);
+            }
+        }
+        mentionRegex.lastIndex = 0;
 
-        for (const name of names) {
+        // Remove mentions so they don't interfere with plaintext name extraction
+        namesSection = namesSection.replace(mentionRegex, '');
+
+        // Step 2: Extract plaintext @names via regex
+        let nameMatch;
+        while ((nameMatch = nameRegex.exec(namesSection)) !== null) {
+            const name = nameMatch[1].trim();
+            if (!name) continue;
             const member = findMember(name, members);
             if (member) {
                 results.push({
@@ -99,9 +118,10 @@ export function parseWordleSummary(
                     guesses,
                 });
             } else {
-                console.warn(`[WordleParser] Could not resolve name: "${name.trim()}"`);
+                console.warn(`[WordleParser] Could not resolve name: "${name}" (from line: "${line.trim()}")`);
             }
         }
+        nameRegex.lastIndex = 0;
     }
 
     return { results, puzzleNumber };

@@ -1,5 +1,5 @@
 import { ApplicationCommandType } from 'discord.js';
-import PinMessageOperation from '../../operations/PinMessageOperation.js';
+import PinMessageOperation from '../../operations/PinMessageOperation';
 import MenuCommand from '../MenuCommand';
 
 export default class PinMessageMenuCommand extends MenuCommand {
