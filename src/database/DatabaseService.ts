@@ -22,7 +22,6 @@ export default class DatabaseService {
             CREATE TABLE IF NOT EXISTS players (
                 user_id TEXT PRIMARY KEY,
                 username TEXT NOT NULL,
-                elo REAL NOT NULL DEFAULT 1000,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -32,21 +31,25 @@ export default class DatabaseService {
                 user_id TEXT NOT NULL REFERENCES players(user_id),
                 puzzle_number INTEGER NOT NULL,
                 guesses INTEGER NOT NULL,
+                percentile REAL,
                 submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(user_id, puzzle_number)
             );
 
             CREATE INDEX IF NOT EXISTS idx_wordle_results_puzzle ON wordle_results(puzzle_number);
-
-            CREATE TABLE IF NOT EXISTS elo_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL REFERENCES players(user_id),
-                puzzle_number INTEGER NOT NULL,
-                elo_before REAL NOT NULL,
-                elo_after REAL NOT NULL,
-                UNIQUE(user_id, puzzle_number)
-            );
         `);
+
+        // Migration: add percentile column if missing, drop legacy tables/columns
+        try {
+            this.db.exec('ALTER TABLE wordle_results ADD COLUMN percentile REAL');
+        } catch {
+            // column already exists
+        }
+        try {
+            this.db.exec('DROP TABLE IF EXISTS elo_history');
+        } catch {
+            // already dropped
+        }
 
         console.log('Database initialized');
     }

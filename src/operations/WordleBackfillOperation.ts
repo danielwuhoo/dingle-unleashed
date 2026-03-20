@@ -1,7 +1,8 @@
 import { ChatInputCommandInteraction, TextChannel } from 'discord.js';
 import { autoInjectable } from 'tsyringe';
 import WordleService from '../wordle/WordleService';
-import { parseWordleSummary, getPuzzleNumberFromDate } from '../wordle/WordleParser';
+import PuzzleDataService from '../wordle/PuzzleDataService';
+import { parseWordleSummary } from '../wordle/WordleParser';
 import DingleConfig from '../models/DingleConfig';
 
 @autoInjectable()
@@ -12,14 +13,18 @@ export default class WordleBackfillOperation {
 
     readonly config: DingleConfig;
 
+    readonly puzzleDataService: PuzzleDataService;
+
     public constructor(
         interaction: ChatInputCommandInteraction,
         wordleService?: WordleService,
         config?: DingleConfig,
+        puzzleDataService?: PuzzleDataService,
     ) {
         this.interaction = interaction;
         this.wordleService = wordleService;
         this.config = config;
+        this.puzzleDataService = puzzleDataService;
     }
 
     public async run(): Promise<void> {
@@ -78,18 +83,21 @@ export default class WordleBackfillOperation {
         let totalNew = 0;
         let totalSkipped = 0;
         let totalPuzzles = 0;
-        const unresolvedNames = new Set<string>();
+
+        this.wordleService.resetData();
+
+        const distributions = await this.puzzleDataService.fetchDistributions();
 
         for (let i = 0; i < wordleMessages.length; i++) {
             const msg = wordleMessages[i];
             const messageDate = new Date(msg.createdTimestamp);
-            const puzzleNumber = getPuzzleNumberFromDate(messageDate);
 
-            const { results } = parseWordleSummary(msg.content, members, messageDate);
+            const { results, puzzleNumber } = parseWordleSummary(msg.content, members, messageDate);
             if (results.length > 0) {
                 const { newResults, skipped } = this.wordleService.processResults(
                     results,
                     puzzleNumber,
+                    distributions,
                 );
                 totalNew += newResults;
                 totalSkipped += skipped;
@@ -103,14 +111,14 @@ export default class WordleBackfillOperation {
             }
         }
 
-        const playersCount = this.wordleService.getLeaderboard(100).length;
+        const playerCount = this.wordleService.getPlayerCount();
 
         await this.interaction.editReply(
             `Backfill complete!\n` +
                 `• **${totalPuzzles}** puzzles processed\n` +
                 `• **${totalNew}** new results added\n` +
                 `• **${totalSkipped}** duplicates skipped\n` +
-                `• **${playersCount}** players found`,
+                `• **${playerCount}** players found`,
         );
     }
 }

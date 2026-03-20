@@ -1,37 +1,52 @@
 import { singleton, inject } from 'tsyringe';
 import DatabaseService from '../database/DatabaseService';
+import PuzzleDataService from './PuzzleDataService';
+import { getPuzzleNumberFromDate } from './WordleParser';
 
-interface PlayerRow {
+export interface LeaderboardRow {
     user_id: string;
     username: string;
-    elo: number;
-}
-
-interface ResultRow {
-    user_id: string;
-    guesses: number;
-}
-
-interface EloHistoryRow {
-    user_id: string;
-    elo_before: number;
-    elo_after: number;
-}
-
-interface LeaderboardRow {
-    user_id: string;
-    username: string;
-    elo: number;
+    avg_percentile: number;
     games: number;
 }
 
+export type LeaderboardTimeWindow = '1m' | '3m' | 'ytd' | 'all';
+
 @singleton()
 export default class WordleService {
-    public constructor(@inject(DatabaseService) private databaseService?: DatabaseService) {}
+    public constructor(
+        @inject(DatabaseService) private databaseService?: DatabaseService,
+        @inject(PuzzleDataService) private puzzleDataService?: PuzzleDataService,
+    ) {}
+
+    private static readonly FALLBACK_PERCENTILES: Record<number, number> = {
+        1: 1,
+        2: 5,
+        3: 18,
+        4: 45,
+        5: 72,
+        6: 90,
+    };
+
+    private getPercentileForResult(
+        distributions: Map<number, { cumulative: number[]; individual: number[] }> | undefined,
+        puzzleNumber: number,
+        guesses: number,
+    ): number {
+        if (distributions?.size) {
+            const perc = this.puzzleDataService.getPercentile(distributions, puzzleNumber, guesses);
+            if (perc !== null) return perc;
+        }
+        if (guesses >= 1 && guesses <= 6) {
+            return WordleService.FALLBACK_PERCENTILES[guesses];
+        }
+        return 100;
+    }
 
     public processResults(
         results: Array<{ userId: string; username: string; guesses: number }>,
         puzzleNumber: number,
+        distributions?: Map<number, { cumulative: number[]; individual: number[] }>,
     ): { newResults: number; skipped: number } {
         let newResults = 0;
         let skipped = 0;
@@ -45,13 +60,15 @@ export default class WordleService {
                 )
                 .run(result.userId, result.username);
 
-            // Insert result (skip duplicates)
+            const percentile = this.getPercentileForResult(distributions, puzzleNumber, result.guesses);
+
+            // Insert result with percentile (skip duplicates)
             try {
                 this.databaseService.db
                     .prepare(
-                        `INSERT INTO wordle_results (user_id, puzzle_number, guesses) VALUES (?, ?, ?)`,
+                        `INSERT INTO wordle_results (user_id, puzzle_number, guesses, percentile) VALUES (?, ?, ?, ?)`,
                     )
-                    .run(result.userId, puzzleNumber, result.guesses);
+                    .run(result.userId, puzzleNumber, result.guesses, percentile);
                 newResults++;
             } catch (e) {
                 if (e.message?.includes('UNIQUE constraint')) {
@@ -62,111 +79,77 @@ export default class WordleService {
             }
         }
 
-        if (newResults > 0) {
-            this.recalculateEloForPuzzle(puzzleNumber);
-        }
-
         return { newResults, skipped };
     }
 
-    private recalculateEloForPuzzle(puzzleNumber: number): void {
-        const transaction = this.databaseService.db.transaction(() => {
-            // Revert previous ELO changes for this puzzle
-            const previousHistory = this.databaseService.db
-                .prepare('SELECT user_id, elo_before FROM elo_history WHERE puzzle_number = ?')
-                .all(puzzleNumber) as EloHistoryRow[];
-
-            for (const row of previousHistory) {
-                this.databaseService.db
-                    .prepare('UPDATE players SET elo = ?, updated_at = datetime(\'now\') WHERE user_id = ?')
-                    .run(row.elo_before, row.user_id);
-            }
-
-            this.databaseService.db
-                .prepare('DELETE FROM elo_history WHERE puzzle_number = ?')
-                .run(puzzleNumber);
-
-            // Get all results for this puzzle
-            const puzzleResults = this.databaseService.db
-                .prepare('SELECT user_id, guesses FROM wordle_results WHERE puzzle_number = ?')
-                .all(puzzleNumber) as ResultRow[];
-
-            if (puzzleResults.length < 2) return;
-
-            // Get current ELO for all participants
-            const players: Record<string, number> = {};
-            for (const result of puzzleResults) {
-                const player = this.databaseService.db
-                    .prepare('SELECT elo FROM players WHERE user_id = ?')
-                    .get(result.user_id) as PlayerRow;
-                players[result.user_id] = player.elo;
-            }
-
-            // Calculate ELO deltas from pairwise comparisons
-            const deltas: Record<string, number> = {};
-            for (const r of puzzleResults) {
-                deltas[r.user_id] = 0;
-            }
-
-            const K = 32;
-            for (let i = 0; i < puzzleResults.length; i++) {
-                for (let j = i + 1; j < puzzleResults.length; j++) {
-                    const a = puzzleResults[i];
-                    const b = puzzleResults[j];
-                    const ratingA = players[a.user_id];
-                    const ratingB = players[b.user_id];
-
-                    const expectedA = 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
-                    const expectedB = 1 - expectedA;
-
-                    let actualA: number;
-                    let actualB: number;
-                    if (a.guesses < b.guesses) {
-                        actualA = 1.0;
-                        actualB = 0.0;
-                    } else if (a.guesses > b.guesses) {
-                        actualA = 0.0;
-                        actualB = 1.0;
-                    } else {
-                        actualA = 0.5;
-                        actualB = 0.5;
-                    }
-
-                    deltas[a.user_id] += K * (actualA - expectedA);
-                    deltas[b.user_id] += K * (actualB - expectedB);
-                }
-            }
-
-            // Apply deltas and record history
-            for (const result of puzzleResults) {
-                const eloBefore = players[result.user_id];
-                const eloAfter = eloBefore + deltas[result.user_id];
-
-                this.databaseService.db
-                    .prepare('UPDATE players SET elo = ?, updated_at = datetime(\'now\') WHERE user_id = ?')
-                    .run(eloAfter, result.user_id);
-
-                this.databaseService.db
-                    .prepare(
-                        `INSERT INTO elo_history (user_id, puzzle_number, elo_before, elo_after) VALUES (?, ?, ?, ?)
-                         ON CONFLICT(user_id, puzzle_number) DO UPDATE SET elo_before = excluded.elo_before, elo_after = excluded.elo_after`,
-                    )
-                    .run(result.user_id, puzzleNumber, eloBefore, eloAfter);
-            }
-        });
-
-        transaction();
+    public resetData(): void {
+        this.databaseService.db.exec(`
+            DELETE FROM wordle_results;
+        `);
+        console.log('[WordleService] Data reset');
     }
 
-    public getLeaderboard(limit: number = 10): LeaderboardRow[] {
+    public getPlayerCount(): number {
+        const row = this.databaseService.db
+            .prepare(`SELECT COUNT(DISTINCT user_id) as count FROM wordle_results`)
+            .get() as { count: number };
+        return row.count;
+    }
+
+    public getLeaderboard(timeWindow: LeaderboardTimeWindow = '3m', limit: number = 10): LeaderboardRow[] {
+        const now = new Date();
+        let cutoffPuzzle: number | null = null;
+        let minGames = 20;
+
+        switch (timeWindow) {
+            case '1m': {
+                const oneMonthAgo = new Date(now);
+                oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                cutoffPuzzle = getPuzzleNumberFromDate(oneMonthAgo);
+                minGames = 7;
+                break;
+            }
+            case '3m': {
+                const threeMonthsAgo = new Date(now);
+                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                cutoffPuzzle = getPuzzleNumberFromDate(threeMonthsAgo);
+                break;
+            }
+            case 'ytd': {
+                const startOfYear = new Date(now.getFullYear(), 0, 1);
+                cutoffPuzzle = getPuzzleNumberFromDate(startOfYear);
+                break;
+            }
+            case 'all':
+                cutoffPuzzle = null;
+                break;
+        }
+
+        if (cutoffPuzzle !== null) {
+            return this.databaseService.db
+                .prepare(
+                    `SELECT wr.user_id, p.username, AVG(wr.percentile) as avg_percentile, COUNT(*) as games
+                     FROM wordle_results wr
+                     JOIN players p ON p.user_id = wr.user_id
+                     WHERE wr.puzzle_number >= ?
+                     GROUP BY wr.user_id
+                     HAVING COUNT(*) >= ?
+                     ORDER BY avg_percentile ASC
+                     LIMIT ?`,
+                )
+                .all(cutoffPuzzle, minGames, limit) as LeaderboardRow[];
+        }
+
         return this.databaseService.db
             .prepare(
-                `SELECT p.user_id, p.username, p.elo,
-                        (SELECT COUNT(*) FROM wordle_results wr WHERE wr.user_id = p.user_id) as games
-                 FROM players p
-                 ORDER BY p.elo DESC
+                `SELECT wr.user_id, p.username, AVG(wr.percentile) as avg_percentile, COUNT(*) as games
+                 FROM wordle_results wr
+                 JOIN players p ON p.user_id = wr.user_id
+                 GROUP BY wr.user_id
+                 HAVING COUNT(*) >= ?
+                 ORDER BY avg_percentile ASC
                  LIMIT ?`,
             )
-            .all(limit) as LeaderboardRow[];
+            .all(minGames, limit) as LeaderboardRow[];
     }
 }

@@ -7,12 +7,17 @@ export interface WordleResult {
 }
 
 export function getPuzzleNumberFromDate(date: Date): number {
-    const wordle0 = new Date('2021-06-19T00:00:00Z');
+    const wordleEpoch = new Date('2021-06-19T00:00:00Z');
     const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const diffMs = target.getTime() - wordle0.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    return diffDays - 1; // "yesterday's results"
+    const diffMs = target.getTime() - wordleEpoch.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
+
+const NAME_ALIASES: Record<string, string> = {
+    '𝖚𝖗 𝖓𝖔𝖙 𝖒𝖞': '141709556223967232',
+    '𝓻𝓪𝓶𝓫𝓸': '141709556223967232',
+    '𝕏𝕩\_🅨🅐🅜🅩\_𝕩𝕏': '187000164525932545',
+};
 
 function normalizeString(str: string): string {
     return str
@@ -33,6 +38,13 @@ function findMember(name: string, members: Collection<string, GuildMember>): Gui
     }
 
     const normalizedName = normalizeString(trimmedName);
+
+    // Check alias map first
+    for (const [alias, userId] of Object.entries(NAME_ALIASES)) {
+        if (normalizeString(trimmedName) === normalizeString(alias) || trimmedName.toLowerCase() === alias.toLowerCase()) {
+            return members.get(userId) || null;
+        }
+    }
 
     // Exact match on displayName (case-insensitive)
     let found = members.find(
@@ -68,7 +80,7 @@ export function parseWordleSummary(
     members: Collection<string, GuildMember>,
     messageDate?: Date,
 ): { results: WordleResult[]; puzzleNumber: number } {
-    const puzzleNumber = getPuzzleNumberFromDate(messageDate || new Date());
+    const puzzleNumber = getPuzzleNumberFromDate(messageDate || new Date()) - 1;
     const results: WordleResult[] = [];
 
     const lines = content.split('\n');

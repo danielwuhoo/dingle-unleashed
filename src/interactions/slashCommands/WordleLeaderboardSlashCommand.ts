@@ -7,7 +7,7 @@ export default class WordleLeaderboardSlashCommand extends SlashCommand {
     public constructor() {
         super();
         this.setName('wordle-leaderboard');
-        this.setDescription('Shows the Wordle ELO leaderboard');
+        this.setDescription('Shows the Wordle leaderboard');
     }
 
     public async run(): Promise<void> {

@@ -1,6 +1,7 @@
-import { ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { ChatInputCommandInteraction } from 'discord.js';
 import { autoInjectable } from 'tsyringe';
 import WordleService from '../wordle/WordleService';
+import { buildLeaderboardReply } from '../wordle/WordleLeaderboardView';
 
 @autoInjectable()
 export default class WordleLeaderboardOperation {
@@ -14,26 +15,14 @@ export default class WordleLeaderboardOperation {
     }
 
     public async run(): Promise<void> {
-        const leaderboard = this.wordleService.getLeaderboard(10);
+        const leaderboard = this.wordleService.getLeaderboard('3m', 10);
 
         if (leaderboard.length === 0) {
             await this.interaction.reply({ content: 'No Wordle results yet!', ephemeral: true });
             return;
         }
 
-        const medals = ['🥇', '🥈', '🥉'];
-        const lines = leaderboard.map((entry, i) => {
-            const rank = medals[i] || `**${i + 1}.**`;
-            const elo = Math.round(entry.elo);
-            return `${rank} **${entry.username}** — ${elo} ELO (${entry.games} games)`;
-        });
-
-        const embed = new EmbedBuilder()
-            .setTitle('🟩 Wordle ELO Leaderboard')
-            .setDescription(lines.join('\n'))
-            .setColor(0x538d4e)
-            .setTimestamp();
-
-        await this.interaction.reply({ embeds: [embed] });
+        const reply = buildLeaderboardReply(leaderboard, '3m');
+        await this.interaction.reply(reply);
     }
 }

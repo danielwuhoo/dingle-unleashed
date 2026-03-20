@@ -3,6 +3,7 @@ import { container } from 'tsyringe';
 import { Event } from '../common/types';
 import DingleConfig from '../models/DingleConfig';
 import WordleService from '../wordle/WordleService';
+import PuzzleDataService from '../wordle/PuzzleDataService';
 import { parseWordleSummary } from '../wordle/WordleParser';
 
 const WordleMessageEvent: Event = {
@@ -27,8 +28,11 @@ const WordleMessageEvent: Event = {
                 return;
             }
 
+            const puzzleDataService = container.resolve(PuzzleDataService);
+            const distributions = await puzzleDataService.fetchDistributions();
+
             const wordleService = container.resolve(WordleService);
-            const { newResults, skipped } = wordleService.processResults(results, puzzleNumber);
+            const { newResults, skipped } = wordleService.processResults(results, puzzleNumber, distributions);
 
             console.log(
                 `[Wordle] Puzzle #${puzzleNumber}: ${newResults} new results, ${skipped} skipped`,
