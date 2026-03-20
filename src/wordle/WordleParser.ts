@@ -16,6 +16,7 @@ export function getPuzzleNumberFromDate(date: Date): number {
 const NAME_ALIASES: Record<string, string> = {
     '𝖚𝖗 𝖓𝖔𝖙 𝖒𝖞': '141709556223967232',
     '𝓻𝓪𝓶𝓫𝓸': '141709556223967232',
+    '𝖎𝖛𝖆𝖓𝖈𝖍𝖔𝖓': '141709556223967232',
     '𝕏𝕩\_🅨🅐🅜🅩\_𝕩𝕏': '187000164525932545',
 };
 
