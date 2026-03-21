@@ -45,7 +45,8 @@ jobs:
           key: ${{ secrets.BRISKET_LOVE_SSH_KEY }}
           port: 6969
           script: |
-            docker pull danielwuhoo/dingle-unleashed:master
             docker stop dingle-unleashed || true
             docker rm dingle-unleashed || true
+            docker image prune -af
+            docker pull danielwuhoo/dingle-unleashed:master
             docker run -d --restart unless-stopped -v ~/dingle-unleashed/data:/opt/app/data --name dingle-unleashed --env-file dingle-unleashed/.env danielwuhoo/dingle-unleashed:master
