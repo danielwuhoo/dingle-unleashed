@@ -14,10 +14,17 @@ export type LeaderboardTimeWindow = '1m' | '3m' | 'ytd' | 'all';
 
 @singleton()
 export default class WordleService {
+    public databaseService: DatabaseService;
+
+    public puzzleDataService: PuzzleDataService;
+
     public constructor(
-        @inject(DatabaseService) private databaseService?: DatabaseService,
-        @inject(PuzzleDataService) private puzzleDataService?: PuzzleDataService,
-    ) {}
+        @inject(DatabaseService) databaseService: DatabaseService,
+        @inject(PuzzleDataService) puzzleDataService: PuzzleDataService,
+    ) {
+        this.databaseService = databaseService;
+        this.puzzleDataService = puzzleDataService;
+    }
 
     private static readonly FALLBACK_PERCENTILES: Record<number, number> = {
         1: 1,
