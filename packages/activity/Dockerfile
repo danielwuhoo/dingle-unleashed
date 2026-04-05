@@ -1,4 +1,4 @@
-FROM node:22.12.0-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_DISCORD_CLIENT_ID
 ENV NEXT_PUBLIC_DISCORD_CLIENT_ID=$NEXT_PUBLIC_DISCORD_CLIENT_ID
@@ -6,7 +6,7 @@ COPY packages/activity/ .
 RUN yarn --no-lockfile
 RUN yarn build
 
-FROM node:22.12.0-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs

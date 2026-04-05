@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: 22.12
+          node-version: 22
       - run: yarn
       - run: yarn workspace dingle-bot build
 
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: 22.12
+          node-version: 22
       - run: yarn
 
       - name: Log in to Docker Hub

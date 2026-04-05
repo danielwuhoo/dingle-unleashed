@@ -1,4 +1,4 @@
-FROM node:22.12.0
+FROM node:22-alpine
 RUN mkdir -p /opt/app
 WORKDIR /opt/app
 COPY packages/bot/package.json ./package.json
