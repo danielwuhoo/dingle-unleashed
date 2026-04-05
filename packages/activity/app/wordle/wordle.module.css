@@ -41,14 +41,14 @@
     35%, 75% { transform: translateX(6px); }
 }
 
-/* Tiles */
+/* Tiles — square, scales with viewport */
 .tile {
-    width: 58px;
-    height: 58px;
+    width: min(58px, 16vw, 12vh);
+    aspect-ratio: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    font-size: min(2rem, 5.5vw, 4vh);
     font-weight: 700;
     text-transform: uppercase;
     border: 2px solid #5b6078;
@@ -159,4 +159,55 @@
 .key.absent {
     background-color: #363a4f;
     color: #8087a2;
+}
+
+/* Small viewports — tighten spacing */
+@media (max-width: 400px), (max-height: 500px) {
+    .container {
+        padding: 0.5rem 0;
+        gap: 0.5rem;
+    }
+
+    .grid {
+        gap: 3px;
+    }
+
+    .row {
+        gap: 3px;
+    }
+}
+
+/* Short viewport — hide keyboard */
+@media (max-height: 500px) {
+    .keyboard {
+        display: none;
+    }
+
+    .container {
+        justify-content: center;
+    }
+}
+
+/* Narrow viewport — scale keyboard */
+@media (max-width: 400px) {
+    .keyboard {
+        gap: 4px;
+        padding: 0 2px;
+    }
+
+    .keyboardRow {
+        gap: 3px;
+    }
+
+    .key {
+        height: 44px;
+        min-width: min(32px, 8vw);
+        padding: 0 4px;
+        font-size: min(0.85rem, 2.8vw);
+    }
+
+    .wideKey {
+        min-width: min(56px, 14vw);
+        font-size: min(0.75rem, 2.5vw);
+    }
 }
