@@ -4,6 +4,7 @@ ARG NEXT_PUBLIC_DISCORD_CLIENT_ID
 ENV NEXT_PUBLIC_DISCORD_CLIENT_ID=$NEXT_PUBLIC_DISCORD_CLIENT_ID
 COPY packages/activity/ .
 RUN yarn --no-lockfile
+ENV DOCKER_BUILD=1
 RUN yarn build
 
 FROM node:22-alpine AS runner
