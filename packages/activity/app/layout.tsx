@@ -1,11 +1,17 @@
 import '@mantine/core/styles.css';
 import Providers from '@/lib/providers';
 import { ColorSchemeScript } from '@mantine/core';
-import { Libre_Franklin } from 'next/font/google';
+import { Libre_Franklin, Arvo } from 'next/font/google';
 
 const libreFranklin = Libre_Franklin({
     subsets: ['latin'],
     variable: '--font-libre-franklin',
+});
+
+const arvo = Arvo({
+    subsets: ['latin'],
+    weight: ['400', '700'],
+    variable: '--font-arvo',
 });
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +22,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="en" suppressHydrationWarning className={libreFranklin.variable}>
+        <html lang="en" suppressHydrationWarning className={`${libreFranklin.variable} ${arvo.variable}`}>
             <head>
                 <ColorSchemeScript defaultColorScheme="dark" />
             </head>

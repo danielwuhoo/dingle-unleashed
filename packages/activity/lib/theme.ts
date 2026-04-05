@@ -41,6 +41,6 @@ colors.dark = [
 export const theme = createTheme({
     primaryColor: 'mauve',
     fontFamily: 'var(--font-libre-franklin), sans-serif',
-    headings: { fontFamily: 'var(--font-libre-franklin), sans-serif' },
+    headings: { fontFamily: 'var(--font-arvo), serif' },
     colors,
 });

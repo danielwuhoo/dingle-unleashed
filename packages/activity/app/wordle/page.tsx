@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Loader, Modal, Stack, Text } from '@mantine/core';
-import { useWordleSolution } from '@/lib/hooks';
+import { useDiscordAuth, useWordleSolution } from '@/lib/hooks';
 import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
+import { GameStatus, loadState, saveState } from '@/lib/wordle';
 import classes from './wordle.module.css';
 
 type LetterState = 'correct' | 'present' | 'absent';
-type GameStatus = 'playing' | 'won' | 'lost';
 
 const WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
@@ -65,35 +65,11 @@ function getKeyboardStates(guesses: string[], solution: string): Map<string, Let
     return map;
 }
 
-interface SavedState {
-    guesses: string[];
-    gameStatus: GameStatus;
-}
-
-function getStorageKey(date: string): string {
-    return `wordle-${date}`;
-}
-
-function loadState(date: string): SavedState | null {
-    if (typeof window === 'undefined') return null;
-    try {
-        const raw = localStorage.getItem(getStorageKey(date));
-        if (!raw) return null;
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
-}
-
-function saveState(date: string, state: SavedState): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(getStorageKey(date), JSON.stringify(state));
-}
-
 export default function WordlePage() {
+    const auth = useDiscordAuth();
     const { data, isLoading, error } = useWordleSolution();
 
-    if (isLoading) {
+    if (auth.isLoading || isLoading) {
         return (
             <Stack align="center" justify="center" h="100vh">
                 <Loader />
