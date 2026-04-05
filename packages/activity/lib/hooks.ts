@@ -78,3 +78,15 @@ export function useDiscordAuth() {
         retry: false,
     });
 }
+
+export function useWordleSolution() {
+    return useQuery({
+        queryKey: ['wordle-solution'],
+        queryFn: async (): Promise<{ solution: string; date: string }> => {
+            const res = await fetch('/api/wordle');
+            return res.json();
+        },
+        staleTime: Infinity,
+        retry: false,
+    });
+}

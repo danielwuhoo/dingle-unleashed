@@ -1,23 +1,27 @@
 'use client';
 
-import { Text, Loader, Stack, Box } from '@mantine/core';
+import { Text, Loader, Stack } from '@mantine/core';
 import { useDiscordAuth } from '@/lib/hooks';
-import classes from './page.module.css';
+import WordlePage from './wordle/page';
 
 export default function Home() {
     const { data: auth, isLoading, error } = useDiscordAuth();
 
-    return (
-        <Box className={classes.container}>
-            <Stack align="center">
-                {isLoading && <Loader />}
-                {error && <Text c="red" size="lg">Error: {error.message}</Text>}
-                {auth && (
-                    <Text size="xl">
-                        Hello, {auth.user.global_name ?? auth.user.username}!
-                    </Text>
-                )}
+    if (isLoading) {
+        return (
+            <Stack align="center" justify="center" h="100vh">
+                <Loader />
             </Stack>
-        </Box>
-    );
+        );
+    }
+
+    if (error) {
+        return (
+            <Stack align="center" justify="center" h="100vh">
+                <Text c="red" size="lg">Error: {error.message}</Text>
+            </Stack>
+        );
+    }
+
+    return <WordlePage />;
 }

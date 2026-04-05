@@ -1,0 +1,162 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 100vh;
+    padding: 1rem 0;
+    gap: 1rem;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.endgameGif {
+    max-width: 100%;
+    max-height: 250px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+/* Grid */
+.grid {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+    justify-content: center;
+}
+
+.row {
+    display: flex;
+    gap: 5px;
+}
+
+.shake {
+    animation: shake 0.25s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15%, 55%, 85% { transform: translateX(-6px); }
+    35%, 75% { transform: translateX(6px); }
+}
+
+/* Tiles */
+.tile {
+    width: 58px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: 2px solid #5b6078;
+    color: #cad3f5;
+    box-sizing: border-box;
+    user-select: none;
+}
+
+.tile.filled {
+    border-color: #8087a2;
+    animation: pop 0.1s ease;
+}
+
+@keyframes pop {
+    50% { transform: scale(1.1); }
+}
+
+/* Revealed tile colors — only applied after flip midpoint via .revealed */
+.tile.correct.revealed {
+    background-color: #a6da95;
+    border-color: #a6da95;
+    color: #24273a;
+}
+
+.tile.present.revealed {
+    background-color: #eed49f;
+    border-color: #eed49f;
+    color: #24273a;
+}
+
+.tile.absent.revealed {
+    background-color: #6e738d;
+    border-color: #6e738d;
+    color: #cad3f5;
+}
+
+/* Flip reveal animation */
+.tile.reveal {
+    animation: flip 0.5s ease forwards;
+}
+
+@keyframes flip {
+    0% {
+        transform: scaleY(1);
+    }
+    50% {
+        transform: scaleY(0);
+    }
+    100% {
+        transform: scaleY(1);
+    }
+}
+
+/* Keyboard */
+.keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 4px;
+    width: 100%;
+}
+
+.keyboardRow {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+}
+
+.key {
+    height: 52px;
+    min-width: 32px;
+    padding: 0 6px;
+    border-radius: 4px;
+    border: none;
+    background-color: #5b6078;
+    color: #cad3f5;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    font-family: inherit;
+}
+
+.key:active {
+    opacity: 0.8;
+}
+
+.wideKey {
+    min-width: 56px;
+    font-size: 0.75rem;
+}
+
+.key.correct {
+    background-color: #a6da95;
+    color: #24273a;
+}
+
+.key.present {
+    background-color: #eed49f;
+    color: #24273a;
+}
+
+.key.absent {
+    background-color: #363a4f;
+    color: #8087a2;
+}
