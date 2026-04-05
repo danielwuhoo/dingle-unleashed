@@ -1,0 +1,11 @@
+node_modules
+packages/*/node_modules
+packages/*/.next
+.git
+.github
+.claude
+.vscode
+data
+*.pem
+.env*
+!.env*.example

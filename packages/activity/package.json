@@ -1,0 +1,27 @@
+{
+    "name": "dingle-activity",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev --experimental-https --port 5173",
+        "build": "next build",
+        "start": "next start"
+    },
+    "dependencies": {
+        "@discord/embedded-app-sdk": "^1.4.0",
+        "@mantine/colors-generator": "^9.0.0",
+        "@mantine/core": "^9.0.0",
+        "@mantine/hooks": "^9.0.0",
+        "@tanstack/react-query": "^5.96.2",
+        "chroma-js": "^3.2.0",
+        "next": "16",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    },
+    "devDependencies": {
+        "@types/chroma-js": "^3.1.2",
+        "@types/node": "^25.5.2",
+        "@types/react": "^19.1.0",
+        "typescript": "^5.7.3"
+    }
+}

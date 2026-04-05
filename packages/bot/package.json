@@ -1,0 +1,51 @@
+{
+  "name": "dingle-bot",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only --poll ./src/index.ts",
+    "start": "node --trace-warnings dist/index.js",
+    "format": "prettier --write src/**/*.{js,jsx,ts,tsx}",
+    "lint": "eslint --fix src/**/*.{js,jsx,ts,tsx}",
+    "build": "tsc"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.18.0",
+    "@types/spotify-web-api-node": "^5.0.3",
+    "@types/yt-search": "^2.3.2",
+    "better-sqlite3": "^12.8.0",
+    "discord-api-types": "^0.37.21",
+    "discord.js": "^14.17.3",
+    "dotenv": "^10.0.0",
+    "ffmpeg-static": "^4.4.0",
+    "googleapis": "^87.0.0",
+    "libsodium-wrappers": "^0.7.9",
+    "mongoose": "^6.0.5",
+    "node-pre-gyp": "^0.17.0",
+    "parse-domain": "^4.1.0",
+    "play-dl": "^1.9.6",
+    "rebuild": "^0.1.2",
+    "spotify-web-api-node": "^5.0.2",
+    "yt-search": "^2.10.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^16.10.1",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.57.1",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-typescript-prettier": "^4.2.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.4.1",
+    "ts-node": "^10.8.1",
+    "ts-node-dev": "^1.1.8",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": "=22.12"
+  }
+}

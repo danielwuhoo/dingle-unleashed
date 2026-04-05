@@ -1,21 +1,16 @@
-version: '3.8'
-
 services:
-  dingle-unleashed:
+  bot:
     image: danielwuhoo/dingle-unleashed:master
-    container_name: dingle-unleashed
-    env_file: .env
-    restart: always
+    container_name: dingle-bot
+    env_file: .env.bot
+    restart: unless-stopped
     volumes:
-      - sqlite-data:/opt/app/data
+      - ./data:/opt/app/data
 
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: -i 60
-    restart: always
-
-volumes:
-  sqlite-data:
+  activity:
+    image: danielwuhoo/dingle-activity:master
+    container_name: dingle-activity
+    env_file: .env.activity
+    restart: unless-stopped
+    ports:
+      - "6767:3000"

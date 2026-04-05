@@ -1,6 +1,18 @@
 node_modules/
-
 dist/
+data/
 .yarn/
 
+# Environment
 .env
+.env.bot
+.env.activity
+.env.local
+.env.*.local
+
+# Next.js (activity)
+.next/
+next-env.d.ts
+
+# mkcert
+*.pem

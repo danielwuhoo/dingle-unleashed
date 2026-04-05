@@ -1,0 +1,80 @@
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { DiscordSDK, DiscordSDKMock } from '@discord/embedded-app-sdk';
+import { createDiscordSdk, isRunningInDiscord } from '@/lib/discord';
+
+interface DiscordUser {
+    id: string;
+    username: string;
+    global_name?: string | null;
+    avatar?: string | null;
+    discriminator: string;
+}
+
+interface DiscordAuth {
+    user: DiscordUser;
+    accessToken: string;
+}
+
+const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID!;
+
+let discordSdk: DiscordSDK | DiscordSDKMock | null = null;
+
+function getDiscordSdk() {
+    if (!discordSdk) {
+        discordSdk = createDiscordSdk(clientId);
+    }
+    return discordSdk;
+}
+
+async function authenticateWithDiscord(): Promise<DiscordAuth> {
+    const sdk = getDiscordSdk();
+    const inDiscord = isRunningInDiscord();
+
+    if (sdk instanceof DiscordSDKMock) {
+        sdk.emitReady();
+    }
+    await sdk.ready();
+
+    const { code } = await sdk.commands.authorize({
+        client_id: clientId,
+        response_type: 'code',
+        state: '',
+        prompt: 'none',
+        scope: ['identify', 'guilds'],
+    });
+
+    if (!inDiscord) {
+        const auth = await sdk.commands.authenticate({ access_token: 'mock_token' });
+        return {
+            user: auth.user as DiscordUser,
+            accessToken: 'mock_token',
+        };
+    }
+
+    const tokenRes = await fetch('/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+    });
+    const { access_token } = await tokenRes.json();
+
+    await sdk.commands.authenticate({ access_token });
+
+    const userRes = await fetch('https://discord.com/api/v10/users/@me', {
+        headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const user: DiscordUser = await userRes.json();
+
+    return { user, accessToken: access_token };
+}
+
+export function useDiscordAuth() {
+    return useQuery({
+        queryKey: ['discord-auth'],
+        queryFn: authenticateWithDiscord,
+        staleTime: Infinity,
+        retry: false,
+    });
+}

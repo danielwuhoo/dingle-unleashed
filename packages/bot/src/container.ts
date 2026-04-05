@@ -1,0 +1,25 @@
+import DingleConfig from './models/DingleConfig';
+import DatabaseService from './database/DatabaseService';
+import PuzzleDataService from './wordle/PuzzleDataService';
+import WordleService from './wordle/WordleService';
+import YoutubeService from './audio/YoutubeService';
+import SpotifyService from './audio/SpotifyService';
+import TrackFactory from './audio/TrackFactory';
+import AudioSubscriptionRepository from './repositories/AudioSubscriptionRepository';
+import SlashCommandRepository from './repositories/SlashCommandRepository';
+import MenuCommandRepository from './repositories/MenuCommandRepository';
+import ButtonCommandRepository from './repositories/ButtonCommandRepository';
+import EventRepository from './repositories/EventRepository';
+
+export const config = new DingleConfig();
+export const databaseService = new DatabaseService();
+export const puzzleDataService = new PuzzleDataService();
+export const wordleService = new WordleService(databaseService, puzzleDataService);
+export const youtubeService = new YoutubeService(config);
+export const spotifyService = new SpotifyService(config);
+export const trackFactory = new TrackFactory(youtubeService, spotifyService);
+export const audioSubscriptionRepository = new AudioSubscriptionRepository();
+export const slashCommandRepository = new SlashCommandRepository();
+export const menuCommandRepository = new MenuCommandRepository();
+export const buttonCommandRepository = new ButtonCommandRepository();
+export const eventRepository = new EventRepository();
