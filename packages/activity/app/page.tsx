@@ -54,6 +54,9 @@ export default function Home() {
                 >
                     {buttonText}
                 </Button>
+                <Text component={Link} href="/history" size="sm" c="dimmed" td="underline">
+                    history
+                </Text>
             </Stack>
         </div>
     );

@@ -135,3 +135,46 @@ export function useSubmitGuess() {
         },
     });
 }
+
+interface PastGame {
+    guesses: string[];
+    gameStatus: 'playing' | 'won' | 'lost';
+    solution: string;
+    puzzleNumber: number;
+    puzzleDate: string;
+}
+
+export function usePastGame(userId: string | undefined, date: string | undefined) {
+    return useQuery({
+        queryKey: ['past-game', userId, date],
+        queryFn: async (): Promise<PastGame> => {
+            const res = await fetch(`/api/game/past?date=${date}`, {
+                headers: { 'x-user-id': userId! },
+            });
+            return res.json();
+        },
+        enabled: !!userId && !!date,
+        staleTime: Infinity,
+    });
+}
+
+interface HistoryEntry {
+    puzzleDate: string;
+    puzzleNumber: number;
+    guesses: string[];
+    solution: string;
+    gameStatus: 'playing' | 'won' | 'lost';
+}
+
+export function useHistory(userId: string | undefined) {
+    return useQuery({
+        queryKey: ['history', userId],
+        queryFn: async (): Promise<HistoryEntry[]> => {
+            const res = await fetch('/api/history', {
+                headers: { 'x-user-id': userId! },
+            });
+            return res.json();
+        },
+        enabled: !!userId,
+    });
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameState, insertGuess } from '@/lib/db';
+import { getGameState, insertGuess, upsertPuzzle, getPuzzleByDate } from '@/lib/db';
 import { words } from '@/lib/words';
 
 const MAX_GUESSES = 6;
@@ -11,14 +11,22 @@ async function getSolution(date: string): Promise<{ solution: string; puzzleNumb
     if (solutionCache && solutionCache.date === date) {
         return solutionCache;
     }
+
+    // Check DB first
+    const cached = getPuzzleByDate(date);
+    if (cached) {
+        solutionCache = { date, solution: cached.solution, puzzleNumber: cached.puzzleNumber };
+        return solutionCache;
+    }
+
     const res = await fetch(`https://www.nytimes.com/svc/wordle/v2/${date}.json`);
     if (!res.ok) throw new Error('Failed to fetch puzzle');
     const data = await res.json();
-    solutionCache = {
-        date,
-        solution: data.solution.toLowerCase(),
-        puzzleNumber: data.days_since_launch ?? data.id ?? 0,
-    };
+    const solution = data.solution.toLowerCase();
+    const puzzleNumber = data.days_since_launch ?? data.id ?? 0;
+
+    upsertPuzzle(puzzleNumber, date, solution);
+    solutionCache = { date, solution, puzzleNumber };
     return solutionCache;
 }
 
@@ -30,7 +38,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Missing user_id or date' }, { status: 400 });
     }
 
-    const state = getGameState(userId, date);
+    const { puzzleNumber } = await getSolution(date);
+    const state = getGameState(userId, puzzleNumber);
     return NextResponse.json(state);
 }
 
@@ -48,7 +57,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid word' }, { status: 400 });
     }
 
-    const current = getGameState(user_id, date);
+    const { solution, puzzleNumber } = await getSolution(date);
+
+    const current = getGameState(user_id, puzzleNumber);
     if (current.gameStatus !== 'playing') {
         return NextResponse.json({ error: 'Game is already over' }, { status: 400 });
     }
@@ -56,12 +67,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No guesses remaining' }, { status: 400 });
     }
 
-    const { solution, puzzleNumber } = await getSolution(date);
     const guessNumber = current.guesses.length + 1;
     const isSolution = lowerWord === solution;
 
-    insertGuess(user_id, date, puzzleNumber, guessNumber, lowerWord, isSolution);
+    insertGuess(user_id, puzzleNumber, guessNumber, lowerWord, isSolution);
 
-    const updated = getGameState(user_id, date);
+    const updated = getGameState(user_id, puzzleNumber);
     return NextResponse.json(updated);
 }

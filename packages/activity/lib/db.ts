@@ -14,11 +14,16 @@ const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
+    CREATE TABLE IF NOT EXISTS wordle_puzzles (
+        puzzle_number INTEGER PRIMARY KEY,
+        puzzle_date TEXT NOT NULL UNIQUE,
+        solution TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS wordle_guesses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
-        puzzle_date TEXT NOT NULL,
-        puzzle_number INTEGER NOT NULL,
+        puzzle_number INTEGER NOT NULL REFERENCES wordle_puzzles(puzzle_number),
         guess_number INTEGER NOT NULL,
         word TEXT NOT NULL,
         is_solution INTEGER NOT NULL DEFAULT 0,
@@ -26,8 +31,11 @@ db.exec(`
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_wordle_guesses_user_puzzle_guess
-        ON wordle_guesses(user_id, puzzle_date, guess_number);
+        ON wordle_guesses(user_id, puzzle_number, guess_number);
 `);
+
+// Migration: drop old columns if they exist (puzzle_date, solution on guesses)
+// New guesses reference wordle_puzzles via puzzle_number instead
 
 interface GuessRow {
     guess_number: number;
@@ -42,10 +50,23 @@ export interface GameState {
     gameStatus: GameStatus;
 }
 
-export function getGameState(userId: string, date: string): GameState {
+export function upsertPuzzle(puzzleNumber: number, date: string, solution: string): void {
+    db.prepare(
+        'INSERT OR IGNORE INTO wordle_puzzles (puzzle_number, puzzle_date, solution) VALUES (?, ?, ?)',
+    ).run(puzzleNumber, date, solution);
+}
+
+export function getPuzzleByDate(date: string): { puzzleNumber: number; solution: string } | null {
+    const row = db
+        .prepare('SELECT puzzle_number, solution FROM wordle_puzzles WHERE puzzle_date = ?')
+        .get(date) as { puzzle_number: number; solution: string } | undefined;
+    return row ? { puzzleNumber: row.puzzle_number, solution: row.solution } : null;
+}
+
+export function getGameState(userId: string, puzzleNumber: number): GameState {
     const rows = db
-        .prepare('SELECT guess_number, word, is_solution FROM wordle_guesses WHERE user_id = ? AND puzzle_date = ? ORDER BY guess_number')
-        .all(userId, date) as GuessRow[];
+        .prepare('SELECT guess_number, word, is_solution FROM wordle_guesses WHERE user_id = ? AND puzzle_number = ? ORDER BY guess_number')
+        .all(userId, puzzleNumber) as GuessRow[];
 
     const guesses = rows.map((r) => r.word);
     const won = rows.some((r) => r.is_solution === 1);
@@ -59,13 +80,87 @@ export function getGameState(userId: string, date: string): GameState {
 
 export function insertGuess(
     userId: string,
-    date: string,
     puzzleNumber: number,
     guessNumber: number,
     word: string,
     isSolution: boolean,
 ): void {
     db.prepare(
-        'INSERT INTO wordle_guesses (user_id, puzzle_date, puzzle_number, guess_number, word, is_solution) VALUES (?, ?, ?, ?, ?, ?)',
-    ).run(userId, date, puzzleNumber, guessNumber, word, isSolution ? 1 : 0);
+        'INSERT INTO wordle_guesses (user_id, puzzle_number, guess_number, word, is_solution) VALUES (?, ?, ?, ?, ?)',
+    ).run(userId, puzzleNumber, guessNumber, word, isSolution ? 1 : 0);
+}
+
+export interface PastGameState {
+    guesses: string[];
+    gameStatus: GameStatus;
+    solution: string;
+    puzzleNumber: number;
+    puzzleDate: string;
+}
+
+export function getPastGame(userId: string, date: string): PastGameState | null {
+    const puzzle = getPuzzleByDate(date);
+    if (!puzzle) return null;
+
+    const state = getGameState(userId, puzzle.puzzleNumber);
+
+    return {
+        guesses: state.guesses,
+        gameStatus: state.gameStatus,
+        solution: puzzle.solution,
+        puzzleNumber: puzzle.puzzleNumber,
+        puzzleDate: date,
+    };
+}
+
+interface HistoryRow {
+    puzzle_number: number;
+    puzzle_date: string;
+    solution: string;
+    word: string;
+    is_solution: number;
+}
+
+export interface HistoryEntry {
+    puzzleDate: string;
+    puzzleNumber: number;
+    guesses: string[];
+    solution: string;
+    gameStatus: GameStatus;
+}
+
+export function getHistory(userId: string): HistoryEntry[] {
+    const rows = db
+        .prepare(
+            `SELECT g.puzzle_number, p.puzzle_date, p.solution, g.word, g.is_solution
+             FROM wordle_guesses g
+             JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
+             WHERE g.user_id = ?
+             ORDER BY p.puzzle_date DESC, g.guess_number ASC`,
+        )
+        .all(userId) as HistoryRow[];
+
+    const grouped = new Map<number, HistoryRow[]>();
+    for (const row of rows) {
+        const existing = grouped.get(row.puzzle_number) || [];
+        existing.push(row);
+        grouped.set(row.puzzle_number, existing);
+    }
+
+    const entries: HistoryEntry[] = [];
+    for (const [, puzzleRows] of grouped) {
+        const guesses = puzzleRows.map((r) => r.word);
+        const won = puzzleRows.some((r) => r.is_solution === 1);
+        const lost = puzzleRows.length >= MAX_GUESSES && !won;
+
+        entries.push({
+            puzzleDate: puzzleRows[0].puzzle_date,
+            puzzleNumber: puzzleRows[0].puzzle_number,
+            guesses,
+            solution: puzzleRows[0].solution,
+            gameStatus: won ? 'won' : lost ? 'lost' : 'playing',
+        });
+    }
+
+    return entries;
 }

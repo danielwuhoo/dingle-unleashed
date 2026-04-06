@@ -1,14 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader, Modal, Stack, Text } from '@mantine/core';
-import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess } from '@/lib/hooks';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { ActionIcon, Loader, Modal, Stack, Text } from '@mantine/core';
+import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess, usePastGame } from '@/lib/hooks';
 import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
 import { GameStatus } from '@/lib/wordle';
+import { getLetterStates, LetterState } from '@/lib/wordle-utils';
 import classes from './wordle.module.css';
-
-type LetterState = 'correct' | 'present' | 'absent';
 
 const WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
@@ -20,30 +21,6 @@ const KEYBOARD_ROWS = [
 ];
 
 const wordSet = new Set(words);
-
-function getLetterStates(guess: string, solution: string): LetterState[] {
-    const states: LetterState[] = Array(WORD_LENGTH).fill('absent');
-    const solutionChars = solution.split('');
-    const remaining: (string | null)[] = [...solutionChars];
-
-    for (let i = 0; i < WORD_LENGTH; i++) {
-        if (guess[i] === solutionChars[i]) {
-            states[i] = 'correct';
-            remaining[i] = null;
-        }
-    }
-
-    for (let i = 0; i < WORD_LENGTH; i++) {
-        if (states[i] === 'correct') continue;
-        const idx = remaining.indexOf(guess[i]);
-        if (idx !== -1) {
-            states[i] = 'present';
-            remaining[idx] = null;
-        }
-    }
-
-    return states;
-}
 
 function getKeyboardStates(guesses: string[], solution: string): Map<string, LetterState> {
     const map = new Map<string, LetterState>();
@@ -64,7 +41,49 @@ function getKeyboardStates(guesses: string[], solution: string): Map<string, Let
 }
 
 export default function WordlePage() {
+    const searchParams = useSearchParams();
+    const viewDate = searchParams.get('date');
+
     const { data: auth, isLoading: authLoading } = useDiscordAuth();
+
+    if (viewDate) {
+        return <PastView userId={auth?.user.id} date={viewDate} isLoading={authLoading} />;
+    }
+
+    return <LiveView auth={auth} isLoading={authLoading} />;
+}
+
+function PastView({ userId, date, isLoading: authLoading }: { userId: string | undefined; date: string; isLoading: boolean }) {
+    const { data: pastGame, isLoading } = usePastGame(userId, date);
+
+    if (authLoading || isLoading) {
+        return (
+            <Stack align="center" justify="center" h="100vh">
+                <Loader />
+            </Stack>
+        );
+    }
+
+    if (!pastGame) {
+        return (
+            <Stack align="center" justify="center" h="100vh">
+                <Text c="red">Puzzle not found</Text>
+            </Stack>
+        );
+    }
+
+    return (
+        <ReadOnlyBoard
+            guesses={pastGame.guesses}
+            solution={pastGame.solution}
+            puzzleNumber={pastGame.puzzleNumber}
+            gameStatus={pastGame.gameStatus}
+            backHref="/history"
+        />
+    );
+}
+
+function LiveView({ auth, isLoading: authLoading }: { auth: any; isLoading: boolean }) {
     const { data: puzzle, isLoading: puzzleLoading, error } = useWordleSolution();
     const { data: serverState, isLoading: gameLoading } = useGameState(auth?.user.id, puzzle?.date);
 
@@ -92,6 +111,79 @@ export default function WordlePage() {
             initialGuesses={serverState?.guesses ?? []}
             initialStatus={serverState?.gameStatus ?? 'playing'}
         />
+    );
+}
+
+function ReadOnlyBoard({ guesses, solution, puzzleNumber, gameStatus, backHref }: {
+    guesses: string[];
+    solution: string;
+    puzzleNumber: number;
+    gameStatus: GameStatus;
+    backHref: string;
+}) {
+    const keyboardStates = getKeyboardStates(guesses, solution);
+
+    return (
+        <div className={classes.container}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
+                <ActionIcon component={Link} href={backHref} variant="subtle" color="gray" size="sm">
+                    <span style={{ fontSize: '1rem' }}>&#8592;</span>
+                </ActionIcon>
+                <Text size="sm" c="dimmed" fw={600}>#{puzzleNumber}</Text>
+                <div style={{ width: 22 }} />
+            </div>
+
+            <div className={classes.grid}>
+                {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
+                    const word = guesses[rowIdx] || '';
+                    const isSubmitted = rowIdx < guesses.length;
+                    const letterStates = isSubmitted ? getLetterStates(word, solution) : null;
+
+                    return (
+                        <div key={rowIdx} className={classes.row}>
+                            {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
+                                const letter = word[colIdx] || '';
+                                const state = letterStates?.[colIdx];
+
+                                let tileClass = classes.tile;
+                                if (isSubmitted && state) {
+                                    tileClass += ` ${classes[state]} ${classes.revealed}`;
+                                }
+
+                                return (
+                                    <div key={colIdx} className={tileClass}>
+                                        <span>{letter}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {gameStatus === 'lost' && (
+                <Text size="md" c="dimmed" tt="uppercase" ta="center">{solution}</Text>
+            )}
+
+            <div className={classes.keyboard}>
+                {KEYBOARD_ROWS.map((row, rowIdx) => (
+                    <div key={rowIdx} className={classes.keyboardRow}>
+                        {row.map((key) => {
+                            const state = keyboardStates.get(key);
+                            let keyClass = classes.key;
+                            if (state) keyClass += ` ${classes[state]}`;
+                            if (key === 'enter' || key === 'backspace') keyClass += ` ${classes.wideKey}`;
+
+                            return (
+                                <div key={key} className={keyClass}>
+                                    {key === 'backspace' ? '⌫' : key}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
@@ -182,7 +274,13 @@ function WordleGame({ solution, date, puzzleNumber, userId, initialGuesses, init
 
     return (
         <div className={classes.container}>
-            <Text size="sm" c="dimmed" fw={600}>#{puzzleNumber}</Text>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
+                <ActionIcon component={Link} href="/" variant="subtle" color="gray" size="sm">
+                    <span style={{ fontSize: '1rem' }}>&#8592;</span>
+                </ActionIcon>
+                <Text size="sm" c="dimmed" fw={600}>#{puzzleNumber}</Text>
+                <div style={{ width: 22 }} />
+            </div>
 
             <Modal
                 opened={modalOpen}
