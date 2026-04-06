@@ -9,6 +9,8 @@ import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
 import { GameStatus } from '@/lib/wordle';
 import { getLetterStates, LetterState } from '@/lib/wordle-utils';
+import { useSocket, useMockSocket } from '@/lib/socket-client';
+import SpectatorPanel from '@/components/SpectatorPanel';
 import classes from './wordle.module.css';
 
 const WORD_LENGTH = 5;
@@ -224,12 +226,22 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
     const [modalOpen, setModalOpen] = useState(initialStatus !== 'playing');
 
     const submitGuessMutation = useSubmitGuess();
+    const isDev = process.env.NODE_ENV === 'development';
+    const socket = useSocket(isDev ? null : {
+        userId, username, avatar, date,
+        guesses: initialGuesses,
+        gameStatus: initialStatus,
+    });
+    const mock = useMockSocket();
+    const players = isDev ? mock.players : socket.players;
+    const emit = isDev ? mock.emit : socket.emit;
 
     const submitGuess = useCallback(() => {
         if (currentGuess.length !== WORD_LENGTH) return;
         if (!wordSet.has(currentGuess)) {
             setShakeRow(guesses.length);
             setTimeout(() => setShakeRow(null), 250);
+            emit('shake');
             return;
         }
 
@@ -238,6 +250,9 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
         setRevealingRow(rowIndex);
         setGuesses(newGuesses);
         setCurrentGuess('');
+
+        const newStatus = currentGuess === solution ? 'won' : newGuesses.length >= MAX_GUESSES ? 'lost' : 'playing';
+        emit('guess', { word: currentGuess, guesses: newGuesses, gameStatus: newStatus });
 
         submitGuessMutation.mutate({ userId, date, word: currentGuess, username, avatar });
 
@@ -267,11 +282,20 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
         if (key === 'enter') {
             submitGuess();
         } else if (key === 'backspace') {
-            setCurrentGuess((prev) => prev.slice(0, -1));
+            setCurrentGuess((prev) => {
+                const next = prev.slice(0, -1);
+                emit('typing', { letterCount: next.length });
+                return next;
+            });
         } else if (key.length === 1 && key >= 'a' && key <= 'z') {
-            setCurrentGuess((prev) => (prev.length < WORD_LENGTH ? prev + key : prev));
+            setCurrentGuess((prev) => {
+                if (prev.length >= WORD_LENGTH) return prev;
+                const next = prev + key;
+                emit('typing', { letterCount: next.length });
+                return next;
+            });
         }
-    }, [gameStatus, revealingRow, submitGuess]);
+    }, [gameStatus, revealingRow, submitGuess, emit]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -369,6 +393,8 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                     );
                 })}
             </div>
+
+            <SpectatorPanel players={players} />
 
             <div className={classes.keyboard}>
                 {KEYBOARD_ROWS.map((row, rowIdx) => (
