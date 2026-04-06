@@ -1,6 +1,7 @@
 import { getLetterStates } from "./wordle-utils";
 
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const CLIENT_ID = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
 const API_BASE = "https://discord.com/api/v10";
 
 const EMOJI_CORRECT = "🟩";
@@ -75,6 +76,24 @@ export function buildBoardEmbed(
   };
 }
 
+function buildActivityButton() {
+    if (!CLIENT_ID) return [];
+    return [
+        {
+            type: 1, // Action Row
+            components: [
+                {
+                    type: 2, // Button
+                    style: 5, // Link
+                    label: 'play with my dingle',
+                    emoji: { name: '🍆' },
+                    url: `https://discord.com/activities/${CLIENT_ID}`,
+                },
+            ],
+        },
+    ];
+}
+
 export async function postMessage(
   channelId: string,
   embed: Record<string, unknown>,
@@ -91,7 +110,7 @@ export async function postMessage(
         Authorization: `Bot ${BOT_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ embeds: [embed] }),
+      body: JSON.stringify({ embeds: [embed], components: buildActivityButton() }),
     });
 
     if (!res.ok) {
@@ -127,7 +146,7 @@ export async function editMessage(
           Authorization: `Bot ${BOT_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ embeds: [embed] }),
+        body: JSON.stringify({ embeds: [embed], components: buildActivityButton() }),
       },
     );
 
