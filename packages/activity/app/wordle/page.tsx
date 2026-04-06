@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Loader, Modal, Stack, Text } from '@mantine/core';
-import { useDiscordAuth, useWordleSolution } from '@/lib/hooks';
+import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess } from '@/lib/hooks';
 import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
-import { GameStatus, loadState, saveState } from '@/lib/wordle';
+import { GameStatus } from '@/lib/wordle';
 import classes from './wordle.module.css';
 
 type LetterState = 'correct' | 'present' | 'absent';
@@ -26,7 +26,6 @@ function getLetterStates(guess: string, solution: string): LetterState[] {
     const solutionChars = solution.split('');
     const remaining: (string | null)[] = [...solutionChars];
 
-    // First pass: correct positions
     for (let i = 0; i < WORD_LENGTH; i++) {
         if (guess[i] === solutionChars[i]) {
             states[i] = 'correct';
@@ -34,7 +33,6 @@ function getLetterStates(guess: string, solution: string): LetterState[] {
         }
     }
 
-    // Second pass: present but wrong position
     for (let i = 0; i < WORD_LENGTH; i++) {
         if (states[i] === 'correct') continue;
         const idx = remaining.indexOf(guess[i]);
@@ -66,17 +64,18 @@ function getKeyboardStates(guesses: string[], solution: string): Map<string, Let
 }
 
 export default function WordlePage() {
-    const auth = useDiscordAuth();
-    const { data, isLoading, error } = useWordleSolution();
+    const { data: auth, isLoading: authLoading } = useDiscordAuth();
+    const { data: puzzle, isLoading: puzzleLoading, error } = useWordleSolution();
+    const { data: serverState, isLoading: gameLoading } = useGameState(auth?.user.id, puzzle?.date);
 
-    if (auth.isLoading || isLoading) {
+    if (authLoading || puzzleLoading || gameLoading) {
         return (
             <Stack align="center" justify="center" h="100vh">
                 <Loader />
             </Stack>
         );
     }
-    if (error || !data) {
+    if (error || !puzzle || !auth) {
         return (
             <Stack align="center" justify="center" h="100vh">
                 <Text c="red">Failed to load puzzle</Text>
@@ -84,37 +83,37 @@ export default function WordlePage() {
         );
     }
 
-    return <WordleGame solution={data.solution} date={data.date} />;
+    return (
+        <WordleGame
+            solution={puzzle.solution}
+            date={puzzle.date}
+            puzzleNumber={puzzle.puzzleNumber}
+            userId={auth.user.id}
+            initialGuesses={serverState?.guesses ?? []}
+            initialStatus={serverState?.gameStatus ?? 'playing'}
+        />
+    );
 }
 
-function WordleGame({ solution, date }: { solution: string; date: string }) {
-    const [guesses, setGuesses] = useState<string[]>([]);
+interface WordleGameProps {
+    solution: string;
+    date: string;
+    puzzleNumber: number;
+    userId: string;
+    initialGuesses: string[];
+    initialStatus: GameStatus;
+}
+
+function WordleGame({ solution, date, puzzleNumber, userId, initialGuesses, initialStatus }: WordleGameProps) {
+    const [guesses, setGuesses] = useState<string[]>(initialGuesses);
     const [currentGuess, setCurrentGuess] = useState('');
-    const [gameStatus, setGameStatus] = useState<GameStatus>('playing');
+    const [gameStatus, setGameStatus] = useState<GameStatus>(initialStatus);
     const [revealingRow, setRevealingRow] = useState<number | null>(null);
     const [revealedTiles, setRevealedTiles] = useState<Set<string>>(new Set());
     const [shakeRow, setShakeRow] = useState<number | null>(null);
-    const [initialized, setInitialized] = useState(false);
-    const [modalOpen, setModalOpen] = useState(false);
+    const [modalOpen, setModalOpen] = useState(initialStatus !== 'playing');
 
-    // Load saved state
-    useEffect(() => {
-        const saved = loadState(date);
-        if (saved) {
-            setGuesses(saved.guesses);
-            setGameStatus(saved.gameStatus);
-            if (saved.gameStatus !== 'playing') {
-                setModalOpen(true);
-            }
-        }
-        setInitialized(true);
-    }, [date]);
-
-    // Save state on change
-    useEffect(() => {
-        if (!initialized) return;
-        saveState(date, { guesses, gameStatus });
-    }, [guesses, gameStatus, date, initialized]);
+    const submitGuessMutation = useSubmitGuess();
 
     const submitGuess = useCallback(() => {
         if (currentGuess.length !== WORD_LENGTH) return;
@@ -124,13 +123,14 @@ function WordleGame({ solution, date }: { solution: string; date: string }) {
             return;
         }
 
-        const newGuesses = [...guesses, currentGuess];
         const rowIndex = guesses.length;
+        const newGuesses = [...guesses, currentGuess];
         setRevealingRow(rowIndex);
         setGuesses(newGuesses);
         setCurrentGuess('');
 
-        // Reveal each tile's color at its flip midpoint (250ms after stagger start)
+        submitGuessMutation.mutate({ userId, date, word: currentGuess });
+
         for (let i = 0; i < WORD_LENGTH; i++) {
             setTimeout(() => {
                 setRevealedTiles((prev) => new Set(prev).add(`${rowIndex}-${i}`));
@@ -148,7 +148,7 @@ function WordleGame({ solution, date }: { solution: string; date: string }) {
                 setModalOpen(true);
             }
         }, revealDuration);
-    }, [currentGuess, guesses, solution]);
+    }, [currentGuess, guesses, solution, userId, date, submitGuessMutation]);
 
     const handleKey = useCallback((key: string) => {
         if (gameStatus !== 'playing') return;
@@ -163,7 +163,6 @@ function WordleGame({ solution, date }: { solution: string; date: string }) {
         }
     }, [gameStatus, revealingRow, submitGuess]);
 
-    // Physical keyboard
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -183,6 +182,8 @@ function WordleGame({ solution, date }: { solution: string; date: string }) {
 
     return (
         <div className={classes.container}>
+            <Text size="sm" c="dimmed" fw={600}>#{puzzleNumber}</Text>
+
             <Modal
                 opened={modalOpen}
                 onClose={() => setModalOpen(false)}

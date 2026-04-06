@@ -21,5 +21,5 @@ export async function GET() {
     }
 
     const data = await response.json();
-    return NextResponse.json({ solution: data.solution.toLowerCase(), date });
+    return NextResponse.json({ solution: data.solution.toLowerCase(), date, puzzleNumber: data.days_since_launch ?? data.id ?? 0 });
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DiscordSDK, DiscordSDKMock } from '@discord/embedded-app-sdk';
 import { createDiscordSdk, isRunningInDiscord } from '@/lib/discord';
 
@@ -82,11 +82,56 @@ export function useDiscordAuth() {
 export function useWordleSolution() {
     return useQuery({
         queryKey: ['wordle-solution'],
-        queryFn: async (): Promise<{ solution: string; date: string }> => {
+        queryFn: async (): Promise<{ solution: string; date: string; puzzleNumber: number }> => {
             const res = await fetch('/api/wordle');
             return res.json();
         },
         staleTime: Infinity,
         retry: false,
+    });
+}
+
+interface GameState {
+    guesses: string[];
+    gameStatus: 'playing' | 'won' | 'lost';
+}
+
+export function useGameState(userId: string | undefined, date: string | undefined) {
+    return useQuery({
+        queryKey: ['game-state', userId, date],
+        queryFn: async (): Promise<GameState> => {
+            const res = await fetch(`/api/game?date=${date}`, {
+                headers: { 'x-user-id': userId! },
+            });
+            return res.json();
+        },
+        enabled: !!userId && !!date,
+        staleTime: Infinity,
+    });
+}
+
+export function useSubmitGuess() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (params: { userId: string; date: string; word: string }): Promise<GameState> => {
+            const res = await fetch('/api/game', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: params.userId,
+                    date: params.date,
+                    word: params.word,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to submit guess');
+            }
+            return res.json();
+        },
+        onSuccess: (data, variables) => {
+            queryClient.setQueryData(['game-state', variables.userId, variables.date], data);
+        },
     });
 }

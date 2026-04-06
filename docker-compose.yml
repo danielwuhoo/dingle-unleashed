@@ -14,3 +14,5 @@ services:
     restart: unless-stopped
     ports:
       - "6767:3000"
+    volumes:
+      - ./data:/opt/app/data
