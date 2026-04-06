@@ -17,17 +17,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/dist-server/server.js ./custom-server.js
 COPY --from=builder /app/dist-server/lib ./lib
-COPY --from=builder /app/node_modules/socket.io ./node_modules/socket.io
-COPY --from=builder /app/node_modules/socket.io-adapter ./node_modules/socket.io-adapter
-COPY --from=builder /app/node_modules/engine.io ./node_modules/engine.io
-COPY --from=builder /app/node_modules/engine.io-parser ./node_modules/engine.io-parser
-COPY --from=builder /app/node_modules/base64id ./node_modules/base64id
-COPY --from=builder /app/node_modules/cors ./node_modules/cors
-COPY --from=builder /app/node_modules/@types/cors ./node_modules/@types/cors
-COPY --from=builder /app/node_modules/cookie ./node_modules/cookie
-COPY --from=builder /app/node_modules/vary ./node_modules/vary
-COPY --from=builder /app/node_modules/negotiator ./node_modules/negotiator
-COPY --from=builder /app/node_modules/ws ./node_modules/ws
+COPY --from=builder /app/node_modules ./node_modules
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 USER nextjs
 EXPOSE 3000

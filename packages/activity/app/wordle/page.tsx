@@ -315,6 +315,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
     const endgame = gameStatus !== 'playing' ? getEndgameContent(guesses.length, gameStatus === 'won') : null;
 
     return (
+        <div className={classes.outer}>
         <div className={classes.container}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
                 <ActionIcon component={Link} href="/" variant="subtle" color="gray" size="sm">
@@ -394,8 +395,6 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 })}
             </div>
 
-            <SpectatorPanel players={players} />
-
             <div className={classes.keyboard}>
                 {KEYBOARD_ROWS.map((row, rowIdx) => (
                     <div key={rowIdx} className={classes.keyboardRow}>
@@ -418,6 +417,8 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                     </div>
                 ))}
             </div>
+        </div>
+        <SpectatorPanel players={players} />
         </div>
     );
 }
