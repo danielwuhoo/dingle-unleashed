@@ -114,7 +114,7 @@ export function useSubmitGuess() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (params: { userId: string; date: string; word: string }): Promise<GameState> => {
+        mutationFn: async (params: { userId: string; date: string; word: string; username?: string; avatar?: string | null }): Promise<GameState> => {
             const res = await fetch('/api/game', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -122,6 +122,8 @@ export function useSubmitGuess() {
                     user_id: params.userId,
                     date: params.date,
                     word: params.word,
+                    username: params.username,
+                    avatar: params.avatar,
                 }),
             });
             if (!res.ok) {
@@ -132,6 +134,23 @@ export function useSubmitGuess() {
         },
         onSuccess: (data, variables) => {
             queryClient.setQueryData(['game-state', variables.userId, variables.date], data);
+        },
+    });
+}
+
+export function useStartGame() {
+    return useMutation({
+        mutationFn: async (params: { userId: string; date: string; username: string; avatar?: string | null }): Promise<void> => {
+            await fetch('/api/game/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: params.userId,
+                    date: params.date,
+                    username: params.username,
+                    avatar: params.avatar,
+                }),
+            });
         },
     });
 }

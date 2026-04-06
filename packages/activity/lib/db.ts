@@ -32,6 +32,16 @@ db.exec(`
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_wordle_guesses_user_puzzle_guess
         ON wordle_guesses(user_id, puzzle_number, guess_number);
+
+    CREATE TABLE IF NOT EXISTS wordle_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        puzzle_number INTEGER NOT NULL,
+        channel_id TEXT NOT NULL,
+        message_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, puzzle_number)
+    );
 `);
 
 // Migration: drop old columns if they exist (puzzle_date, solution on guesses)
@@ -163,4 +173,75 @@ export function getHistory(userId: string): HistoryEntry[] {
     }
 
     return entries;
+}
+
+// Sessions
+
+interface SessionRow {
+    id: number;
+    user_id: string;
+    puzzle_number: number;
+    channel_id: string;
+    message_id: string | null;
+}
+
+export interface Session {
+    id: number;
+    userId: string;
+    puzzleNumber: number;
+    channelId: string;
+    messageId: string | null;
+}
+
+export function getSession(userId: string, puzzleNumber: number): Session | null {
+    const row = db
+        .prepare('SELECT * FROM wordle_sessions WHERE user_id = ? AND puzzle_number = ?')
+        .get(userId, puzzleNumber) as SessionRow | undefined;
+    if (!row) return null;
+    return {
+        id: row.id,
+        userId: row.user_id,
+        puzzleNumber: row.puzzle_number,
+        channelId: row.channel_id,
+        messageId: row.message_id,
+    };
+}
+
+export function createSession(userId: string, puzzleNumber: number, channelId: string): Session {
+    db.prepare(
+        'INSERT OR IGNORE INTO wordle_sessions (user_id, puzzle_number, channel_id) VALUES (?, ?, ?)',
+    ).run(userId, puzzleNumber, channelId);
+    return getSession(userId, puzzleNumber)!;
+}
+
+export function updateSessionMessageId(userId: string, puzzleNumber: number, messageId: string): void {
+    db.prepare(
+        'UPDATE wordle_sessions SET message_id = ? WHERE user_id = ? AND puzzle_number = ?',
+    ).run(messageId, userId, puzzleNumber);
+}
+
+// Summary
+
+export interface DailySummaryRow {
+    userId: string;
+    guessCount: number;
+    won: boolean;
+}
+
+export function getDailySummary(puzzleNumber: number): DailySummaryRow[] {
+    const rows = db
+        .prepare(
+            `SELECT user_id, COUNT(*) as guess_count, MAX(is_solution) as solved
+             FROM wordle_guesses
+             WHERE puzzle_number = ?
+             GROUP BY user_id
+             HAVING guess_count >= 1`,
+        )
+        .all(puzzleNumber) as { user_id: string; guess_count: number; solved: number }[];
+
+    return rows.map((r) => ({
+        userId: r.user_id,
+        guessCount: r.guess_count,
+        won: r.solved === 1,
+    }));
 }

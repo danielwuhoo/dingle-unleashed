@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ActionIcon, Loader, Modal, Stack, Text } from '@mantine/core';
-import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess, usePastGame } from '@/lib/hooks';
+import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess, useStartGame, usePastGame } from '@/lib/hooks';
 import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
 import { GameStatus } from '@/lib/wordle';
@@ -86,6 +86,20 @@ function PastView({ userId, date, isLoading: authLoading }: { userId: string | u
 function LiveView({ auth, isLoading: authLoading }: { auth: any; isLoading: boolean }) {
     const { data: puzzle, isLoading: puzzleLoading, error } = useWordleSolution();
     const { data: serverState, isLoading: gameLoading } = useGameState(auth?.user.id, puzzle?.date);
+    const startGame = useStartGame();
+    const startedRef = useRef(false);
+
+    useEffect(() => {
+        if (auth && puzzle && !startedRef.current) {
+            startedRef.current = true;
+            startGame.mutate({
+                userId: auth.user.id,
+                date: puzzle.date,
+                username: auth.user.global_name ?? auth.user.username,
+                avatar: auth.user.avatar,
+            });
+        }
+    }, [auth?.user.id, puzzle?.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (authLoading || puzzleLoading || gameLoading) {
         return (
@@ -108,6 +122,8 @@ function LiveView({ auth, isLoading: authLoading }: { auth: any; isLoading: bool
             date={puzzle.date}
             puzzleNumber={puzzle.puzzleNumber}
             userId={auth.user.id}
+            username={auth.user.global_name ?? auth.user.username}
+            avatar={auth.user.avatar}
             initialGuesses={serverState?.guesses ?? []}
             initialStatus={serverState?.gameStatus ?? 'playing'}
         />
@@ -192,11 +208,13 @@ interface WordleGameProps {
     date: string;
     puzzleNumber: number;
     userId: string;
+    username: string;
+    avatar?: string | null;
     initialGuesses: string[];
     initialStatus: GameStatus;
 }
 
-function WordleGame({ solution, date, puzzleNumber, userId, initialGuesses, initialStatus }: WordleGameProps) {
+function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, initialGuesses, initialStatus }: WordleGameProps) {
     const [guesses, setGuesses] = useState<string[]>(initialGuesses);
     const [currentGuess, setCurrentGuess] = useState('');
     const [gameStatus, setGameStatus] = useState<GameStatus>(initialStatus);
@@ -221,7 +239,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, initialGuesses, init
         setGuesses(newGuesses);
         setCurrentGuess('');
 
-        submitGuessMutation.mutate({ userId, date, word: currentGuess });
+        submitGuessMutation.mutate({ userId, date, word: currentGuess, username, avatar });
 
         for (let i = 0; i < WORD_LENGTH; i++) {
             setTimeout(() => {

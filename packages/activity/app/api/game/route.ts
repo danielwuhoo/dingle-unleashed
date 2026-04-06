@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameState, insertGuess, upsertPuzzle, getPuzzleByDate } from '@/lib/db';
+import { getGameState, insertGuess, upsertPuzzle, getPuzzleByDate, getSession } from '@/lib/db';
+import { buildBoardEmbed, editMessage } from '@/lib/discord-api';
 import { words } from '@/lib/words';
 
 const MAX_GUESSES = 6;
@@ -73,5 +74,14 @@ export async function POST(request: NextRequest) {
     insertGuess(user_id, puzzleNumber, guessNumber, lowerWord, isSolution);
 
     const updated = getGameState(user_id, puzzleNumber);
+
+    // Update Discord message if session exists
+    const session = getSession(user_id, puzzleNumber);
+    if (session?.messageId) {
+        const user = { username: body.username || 'someone', userId: user_id, avatar: body.avatar };
+        const embed = buildBoardEmbed(user, puzzleNumber, updated.guesses, solution, updated.gameStatus);
+        editMessage(session.channelId, session.messageId, embed).catch(() => {});
+    }
+
     return NextResponse.json(updated);
 }
