@@ -15,4 +15,4 @@ services:
     ports:
       - "6767:3000"
     volumes:
-      - ./data:/opt/app/data
+      - ./data:/app/data
