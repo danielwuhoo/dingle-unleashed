@@ -4,7 +4,8 @@
     min-height: 100vh;
     max-width: 600px;
     margin: 0 auto;
-    padding: 1rem;
+    padding: min(1rem, 1.5vh);
+    padding-top: min(1rem, 1.5vh);
     gap: 1rem;
 }
 
@@ -16,7 +17,14 @@
     top: 0;
     z-index: 10;
     background-color: var(--mantine-color-body);
-    padding: 1rem 0;
+    padding: min(1rem, 1.5vh) 0;
+}
+
+/* Mobile — more top padding */
+@media (max-width: 500px) {
+    .container {
+        padding-top: min(2rem, 3vh);
+    }
 }
 
 .grid {

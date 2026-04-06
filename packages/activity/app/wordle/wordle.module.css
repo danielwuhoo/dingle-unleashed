@@ -1,23 +1,15 @@
-.outer {
-    display: flex;
-    flex-direction: row;
-    height: 100vh;
-    height: 100dvh;
-    overflow: hidden;
-}
-
 .container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    flex: 1;
-    min-height: 0;
-    padding: 1rem 0;
-    gap: 1rem;
+    justify-content: space-evenly;
+    height: 100vh;
+    height: 100dvh;
+    padding: min(1rem, 1.5vh) 0 min(1rem, 1.5vh);
     max-width: 500px;
     margin: 0 auto;
     width: 100%;
+    overflow: hidden;
 }
 
 .endgameGif {
@@ -51,12 +43,12 @@
 
 /* Tiles — square, scales with viewport */
 .tile {
-    width: min(58px, 16vw, 10vh);
+    width: min(58px, 16vw, 8vh);
     aspect-ratio: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: min(2rem, 5.5vw, 3.5vh);
+    font-size: min(2rem, 5.5vw, 2.8vh);
     font-weight: 700;
     text-transform: uppercase;
     border: 2px solid #5b6078;
@@ -115,7 +107,7 @@
     display: flex;
     flex-direction: column;
     gap: min(6px, 0.8vh);
-    padding: 0 4px 1rem;
+    padding: 0 4px min(1rem, 1.5vh);
     width: 100%;
 }
 
@@ -126,14 +118,14 @@
 }
 
 .key {
-    height: min(52px, 6vh);
+    height: min(52px, 5vh);
     min-width: min(32px, 8vw);
     padding: 0 6px;
     border-radius: 4px;
     border: none;
     background-color: #5b6078;
     color: #cad3f5;
-    font-size: min(0.85rem, 1.8vh);
+    font-size: min(0.85rem, 1.5vh);
     font-weight: 600;
     text-transform: uppercase;
     cursor: pointer;
@@ -151,7 +143,7 @@
 
 .wideKey {
     min-width: min(56px, 14vw);
-    font-size: min(0.75rem, 1.5vh);
+    font-size: min(0.75rem, 1.2vh);
 }
 
 .key.correct {
@@ -169,14 +161,9 @@
     color: #8087a2;
 }
 
-/* Short viewports — tighten */
-@media (max-height: 500px) {
+/* Mobile — more top padding */
+@media (max-width: 500px) {
     .container {
-        padding: 0.5rem 0;
-        gap: 0.25rem;
-    }
-
-    .keyboard {
-        padding: 0 4px 0.5rem;
+        padding-top: min(2rem, 3vh);
     }
 }

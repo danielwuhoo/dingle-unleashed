@@ -18,7 +18,7 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/dist-server/server.js ./custom-server.js
 COPY --from=builder /app/dist-server/lib ./lib
 COPY --from=builder /app/node_modules ./node_modules
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+RUN mkdir -p /app/data /app/.next/cache && chown -R nextjs:nodejs /app/data /app/.next/cache
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000

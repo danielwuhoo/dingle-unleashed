@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Text } from '@mantine/core';
 import { SpectatorPlayer } from '@/lib/socket-client';
-import { LetterState } from '@/lib/wordle-utils';
 import classes from './SpectatorPanel.module.css';
 
 const WORD_LENGTH = 5;
@@ -15,6 +15,21 @@ function getAvatarUrl(userId: string, avatar?: string | null): string | undefine
 }
 
 function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
+    const [revealedTiles, setRevealedTiles] = useState<Set<string>>(new Set());
+    const prevRowCount = useRef(player.rows.length);
+
+    useEffect(() => {
+        if (player.rows.length > prevRowCount.current) {
+            const rowIdx = player.rows.length - 1;
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                setTimeout(() => {
+                    setRevealedTiles((prev) => new Set(prev).add(`${rowIdx}-${i}`));
+                }, i * 300 + 250);
+            }
+        }
+        prevRowCount.current = player.rows.length;
+    }, [player.rows.length]);
+
     return (
         <div className={classes.miniBoard}>
             {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
@@ -30,10 +45,13 @@ function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
                         className={`${classes.miniRow} ${isShaking ? classes.miniShake : ''}`}
                     >
                         {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
+                            const tileRevealed = revealedTiles.has(`${rowIdx}-${colIdx}`);
                             let tileClass = classes.miniTile;
 
                             if (isSubmitted && states) {
-                                tileClass += ` ${classes[states[colIdx]]}`;
+                                if (tileRevealed || !isRevealing) {
+                                    tileClass += ` ${classes[states[colIdx]]}`;
+                                }
                                 if (isRevealing) {
                                     tileClass += ` ${classes.miniReveal}`;
                                 }
