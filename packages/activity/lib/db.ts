@@ -177,12 +177,18 @@ export function getHistory(userId: string): HistoryEntry[] {
 
 // Sessions
 
+// Migration: add username and avatar columns
+try { db.exec('ALTER TABLE wordle_sessions ADD COLUMN username TEXT NOT NULL DEFAULT \'\''); } catch {}
+try { db.exec('ALTER TABLE wordle_sessions ADD COLUMN avatar TEXT'); } catch {}
+
 interface SessionRow {
     id: number;
     user_id: string;
     puzzle_number: number;
     channel_id: string;
     message_id: string | null;
+    username: string;
+    avatar: string | null;
 }
 
 export interface Session {
@@ -191,6 +197,8 @@ export interface Session {
     puzzleNumber: number;
     channelId: string;
     messageId: string | null;
+    username: string;
+    avatar: string | null;
 }
 
 export function getSession(userId: string, puzzleNumber: number): Session | null {
@@ -204,20 +212,43 @@ export function getSession(userId: string, puzzleNumber: number): Session | null
         puzzleNumber: row.puzzle_number,
         channelId: row.channel_id,
         messageId: row.message_id,
+        username: row.username,
+        avatar: row.avatar,
     };
 }
 
-export function createSession(userId: string, puzzleNumber: number, channelId: string): Session {
+export function createSession(userId: string, puzzleNumber: number, channelId: string, username: string, avatar?: string | null): Session {
     db.prepare(
-        'INSERT OR IGNORE INTO wordle_sessions (user_id, puzzle_number, channel_id) VALUES (?, ?, ?)',
-    ).run(userId, puzzleNumber, channelId);
+        'INSERT OR IGNORE INTO wordle_sessions (user_id, puzzle_number, channel_id, username, avatar) VALUES (?, ?, ?, ?, ?)',
+    ).run(userId, puzzleNumber, channelId, username, avatar ?? null);
     return getSession(userId, puzzleNumber)!;
+}
+
+export function updateSessionUserInfo(userId: string, puzzleNumber: number, username: string, avatar?: string | null): void {
+    db.prepare(
+        'UPDATE wordle_sessions SET username = ?, avatar = ? WHERE user_id = ? AND puzzle_number = ?',
+    ).run(username, avatar ?? null, userId, puzzleNumber);
 }
 
 export function updateSessionMessageId(userId: string, puzzleNumber: number, messageId: string): void {
     db.prepare(
         'UPDATE wordle_sessions SET message_id = ? WHERE user_id = ? AND puzzle_number = ?',
     ).run(messageId, userId, puzzleNumber);
+}
+
+export function getSessionsForPuzzle(puzzleNumber: number): Session[] {
+    const rows = db
+        .prepare('SELECT * FROM wordle_sessions WHERE puzzle_number = ?')
+        .all(puzzleNumber) as SessionRow[];
+    return rows.map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        puzzleNumber: row.puzzle_number,
+        channelId: row.channel_id,
+        messageId: row.message_id,
+        username: row.username,
+        avatar: row.avatar,
+    }));
 }
 
 // Summary

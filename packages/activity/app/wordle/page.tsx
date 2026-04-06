@@ -1,15 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ActionIcon, Loader, Modal, Stack, Text } from '@mantine/core';
-import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess, useStartGame, usePastGame } from '@/lib/hooks';
+import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess, useStartGame, useAllPlayers, usePastGame } from '@/lib/hooks';
 import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
 import { GameStatus } from '@/lib/wordle';
 import { getLetterStates, LetterState } from '@/lib/wordle-utils';
-import { useSocket, useMockSocket } from '@/lib/socket-client';
+import { useSocket, useMockSocket, SpectatorPlayer } from '@/lib/socket-client';
 import SpectatorPanel from '@/components/SpectatorPanel';
 import classes from './wordle.module.css';
 
@@ -233,8 +233,36 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
         gameStatus: initialStatus,
     });
     const mock = useMockSocket();
-    const players = isDev ? mock.players : socket.players;
+    const socketPlayers = isDev ? mock.players : socket.players;
     const emit = isDev ? mock.emit : socket.emit;
+    const { data: dbPlayers } = useAllPlayers(date);
+
+    const players = useMemo(() => {
+        const merged = new Map<string, SpectatorPlayer>();
+        // Add DB players first (offline baseline)
+        if (dbPlayers) {
+            for (const p of dbPlayers) {
+                if (p.userId === userId) continue;
+                merged.set(p.userId, {
+                    userId: p.userId,
+                    username: p.username,
+                    avatar: p.avatar,
+                    rows: p.rows,
+                    gameStatus: p.gameStatus,
+                    letterCount: 0,
+                    shaking: false,
+                    revealingRow: null,
+                    isOnline: false,
+                });
+            }
+        }
+        // Overlay socket players (online, live data)
+        for (const [, p] of socketPlayers) {
+            if (p.userId === userId) continue;
+            merged.set(p.userId, { ...p, isOnline: p.isOnline ?? true });
+        }
+        return merged;
+    }, [dbPlayers, socketPlayers, userId]);
 
     const submitGuess = useCallback(() => {
         if (currentGuess.length !== WORD_LENGTH) return;

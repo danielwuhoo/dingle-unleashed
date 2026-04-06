@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, createSession, updateSessionMessageId, getGameState, upsertPuzzle, getPuzzleByDate } from '@/lib/db';
+import { getSession, createSession, updateSessionMessageId, updateSessionUserInfo, getGameState, upsertPuzzle, getPuzzleByDate } from '@/lib/db';
 import { buildBoardEmbed, postMessage } from '@/lib/discord-api';
 
 const WORDLE_CHANNEL_ID = process.env.DISCORD_WORDLE_CHANNEL_ID;
@@ -34,11 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     const existing = getSession(user_id, puzzle.puzzleNumber);
-    if (existing?.messageId) {
-        return NextResponse.json({ ok: true });
+    if (existing) {
+        updateSessionUserInfo(user_id, puzzle.puzzleNumber, username || 'someone', avatar);
+        if (existing.messageId) {
+            return NextResponse.json({ ok: true });
+        }
     }
 
-    const session = existing ?? createSession(user_id, puzzle.puzzleNumber, WORDLE_CHANNEL_ID);
+    const session = existing ?? createSession(user_id, puzzle.puzzleNumber, WORDLE_CHANNEL_ID, username || 'someone', avatar);
     const state = getGameState(user_id, puzzle.puzzleNumber);
 
     const user = { username: username || 'someone', userId: user_id, avatar };

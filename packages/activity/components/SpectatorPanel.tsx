@@ -77,20 +77,26 @@ function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
 export default function SpectatorPanel({ players }: { players: Map<string, SpectatorPlayer> }) {
     if (players.size === 0) return null;
 
+    const sorted = Array.from(players.values()).sort((a, b) => {
+        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+        return 0;
+    });
+
     return (
         <div className={classes.panel}>
-            {Array.from(players.values()).map((player) => {
+            {sorted.map((player) => {
                 const avatarUrl = getAvatarUrl(player.userId, player.avatar);
+                const avatarClass = `${avatarUrl ? classes.avatar : classes.avatarPlaceholder} ${player.isOnline ? classes.avatarOnline : ''}`;
 
                 return (
                     <div key={player.userId} className={classes.playerCard}>
                         <div className={classes.playerHeader}>
                             {avatarUrl ? (
-                                <img src={avatarUrl} alt="" className={classes.avatar} />
+                                <img src={avatarUrl} alt="" className={avatarClass} />
                             ) : (
-                                <div className={classes.avatarPlaceholder} />
+                                <div className={avatarClass} />
                             )}
-                            <Text size="xs" c="dimmed" truncate>{player.username}</Text>
+                            <Text size="xs" c={player.isOnline ? '#a6da95' : 'dimmed'} fw={player.isOnline ? 700 : 400} truncate>{player.username}</Text>
                         </div>
                         <MiniSpectatorBoard player={player} />
                     </div>

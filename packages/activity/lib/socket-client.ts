@@ -13,6 +13,7 @@ export interface SpectatorPlayer {
     letterCount: number;
     shaking: boolean;
     revealingRow: number | null;
+    isOnline: boolean;
 }
 
 interface UseSocketOptions {
@@ -48,7 +49,7 @@ export function useSocket(options: UseSocketOptions | null) {
         socket.on('room_state', (data: { players: SpectatorPlayer[] }) => {
             const map = new Map<string, SpectatorPlayer>();
             for (const p of data.players) {
-                map.set(p.userId, { ...p, shaking: false, revealingRow: null });
+                map.set(p.userId, { ...p, shaking: false, revealingRow: null, isOnline: true });
             }
             setPlayers(map);
         });
@@ -56,7 +57,7 @@ export function useSocket(options: UseSocketOptions | null) {
         socket.on('player_joined', (player: SpectatorPlayer) => {
             setPlayers((prev) => {
                 const next = new Map(prev);
-                next.set(player.userId, { ...player, shaking: false, revealingRow: null });
+                next.set(player.userId, { ...player, shaking: false, revealingRow: null, isOnline: true });
                 return next;
             });
         });
@@ -126,7 +127,10 @@ export function useSocket(options: UseSocketOptions | null) {
         socket.on('player_left', (data: { userId: string }) => {
             setPlayers((prev) => {
                 const next = new Map(prev);
-                next.delete(data.userId);
+                const player = next.get(data.userId);
+                if (player) {
+                    next.set(data.userId, { ...player, isOnline: false, letterCount: 0, shaking: false, revealingRow: null });
+                }
                 return next;
             });
         });
@@ -155,52 +159,52 @@ export function useMockSocket(): { players: Map<string, SpectatorPlayer>; emit: 
 
         const mockPlayers: SpectatorPlayer[] = [
             {
-                userId: 'mock-1', username: 'sarah', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-1', username: 'sarah', avatar: null, shaking: false, revealingRow: null, isOnline: true,
                 rows: [['absent','absent','present','absent','absent'],['correct','absent','absent','present','absent'],['correct','correct','correct','absent','present']],
                 gameStatus: 'playing', letterCount: 3,
             },
             {
-                userId: 'mock-2', username: 'mike', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-2', username: 'mike', avatar: null, shaking: false, revealingRow: null, isOnline: true,
                 rows: [['absent','present','absent','absent','correct'],['present','absent','correct','absent','correct'],['correct','correct','correct','correct','correct']],
                 gameStatus: 'won', letterCount: 0,
             },
             {
-                userId: 'mock-3', username: 'alex', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-3', username: 'alex', avatar: null, shaking: false, revealingRow: null, isOnline: false,
                 rows: [['absent','absent','absent','present','absent']],
                 gameStatus: 'playing', letterCount: 0,
             },
             {
-                userId: 'mock-4', username: 'jordan', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-4', username: 'jordan', avatar: null, shaking: false, revealingRow: null, isOnline: true,
                 rows: [['present','absent','absent','absent','present'],['absent','correct','present','absent','absent'],['correct','correct','absent','correct','absent'],['correct','correct','correct','correct','correct']],
                 gameStatus: 'won', letterCount: 0,
             },
             {
-                userId: 'mock-5', username: 'taylor', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-5', username: 'taylor', avatar: null, shaking: false, revealingRow: null, isOnline: false,
                 rows: [['absent','absent','correct','absent','absent'],['absent','present','correct','absent','present']],
                 gameStatus: 'playing', letterCount: 4,
             },
             {
-                userId: 'mock-6', username: 'chris', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-6', username: 'chris', avatar: null, shaking: false, revealingRow: null, isOnline: true,
                 rows: [['absent','absent','absent','absent','absent'],['present','absent','absent','present','absent'],['absent','correct','present','absent','correct'],['correct','absent','correct','correct','correct'],['absent','correct','correct','correct','correct'],['present','absent','correct','absent','correct']],
                 gameStatus: 'lost', letterCount: 0,
             },
             {
-                userId: 'mock-7', username: 'yaman', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-7', username: 'yaman', avatar: null, shaking: false, revealingRow: null, isOnline: false,
                 rows: [],
                 gameStatus: 'playing', letterCount: 1,
             },
             {
-                userId: 'mock-8', username: 'priya', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-8', username: 'priya', avatar: null, shaking: false, revealingRow: null, isOnline: true,
                 rows: [['present','absent','correct','absent','absent'],['correct','correct','correct','absent','correct']],
                 gameStatus: 'playing', letterCount: 2,
             },
             {
-                userId: 'mock-9', username: 'ben', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-9', username: 'ben', avatar: null, shaking: false, revealingRow: null, isOnline: false,
                 rows: [['absent','absent','absent','absent','present'],['absent','present','absent','correct','absent'],['present','correct','absent','correct','correct'],['correct','correct','correct','correct','correct']],
                 gameStatus: 'won', letterCount: 0,
             },
             {
-                userId: 'mock-10', username: 'nina', avatar: null, shaking: false, revealingRow: null,
+                userId: 'mock-10', username: 'nina', avatar: null, shaking: false, revealingRow: null, isOnline: true,
                 rows: [['absent','correct','absent','absent','absent']],
                 gameStatus: 'playing', letterCount: 5,
             },

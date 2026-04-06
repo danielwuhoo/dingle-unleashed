@@ -155,6 +155,28 @@ export function useStartGame() {
     });
 }
 
+import { LetterState } from './wordle-utils';
+
+interface PlayerInfo {
+    userId: string;
+    username: string;
+    avatar: string | null;
+    rows: LetterState[][];
+    gameStatus: 'playing' | 'won' | 'lost';
+}
+
+export function useAllPlayers(date: string | undefined) {
+    return useQuery({
+        queryKey: ['all-players', date],
+        queryFn: async (): Promise<PlayerInfo[]> => {
+            const res = await fetch(`/api/game/players?date=${date}`);
+            return res.json();
+        },
+        enabled: !!date,
+        refetchInterval: 30000,
+    });
+}
+
 interface PastGame {
     guesses: string[];
     gameStatus: 'playing' | 'won' | 'lost';
