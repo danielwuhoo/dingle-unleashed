@@ -248,6 +248,8 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                     username: p.username,
                     avatar: p.avatar,
                     rows: p.rows,
+                    guesses: [],
+                    currentWord: '',
                     gameStatus: p.gameStatus,
                     letterCount: 0,
                     shaking: false,
@@ -312,14 +314,14 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
         } else if (key === 'backspace') {
             setCurrentGuess((prev) => {
                 const next = prev.slice(0, -1);
-                emit('typing', { letterCount: next.length });
+                emit('typing', { letterCount: next.length, currentWord: next });
                 return next;
             });
         } else if (key.length === 1 && key >= 'a' && key <= 'z') {
             setCurrentGuess((prev) => {
                 if (prev.length >= WORD_LENGTH) return prev;
                 const next = prev + key;
-                emit('typing', { letterCount: next.length });
+                emit('typing', { letterCount: next.length, currentWord: next });
                 return next;
             });
         }
@@ -365,7 +367,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
             >
                 {endgame && (
                     <Stack align="center" gap="md">
-                        <img src={endgame.gif} alt="" className={classes.endgameGif} />
+                        <img src={`/api/gif?url=${encodeURIComponent(endgame.gif)}`} alt="" className={classes.endgameGif} />
                         <Text size="xl" fw={700} ta="center">{endgame.text}</Text>
                         {gameStatus === 'lost' && (
                             <Text size="md" c="dimmed" tt="uppercase">{solution}</Text>
@@ -422,7 +424,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 })}
             </div>
 
-            <SpectatorPanel players={players} />
+            <SpectatorPanel players={players} viewerFinished={gameStatus !== 'playing'} />
 
             <div className={classes.keyboard}>
                 {KEYBOARD_ROWS.map((row, rowIdx) => (

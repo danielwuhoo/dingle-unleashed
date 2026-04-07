@@ -72,6 +72,24 @@
     box-sizing: border-box;
 }
 
+.miniTileWithLetter {
+    width: min(12px, 1.6vh);
+    height: min(12px, 1.6vh);
+    font-size: min(7px, 1vh);
+}
+
+.miniLetter {
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1;
+    color: #cad3f5;
+}
+
+.correct .miniLetter,
+.present .miniLetter {
+    color: #24273a;
+}
+
 .miniTyping {
     background-color: #5b6078;
     border-color: #8087a2;

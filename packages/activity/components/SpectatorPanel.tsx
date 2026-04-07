@@ -14,7 +14,7 @@ function getAvatarUrl(userId: string, avatar?: string | null): string | undefine
     return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.${ext}?size=64`;
 }
 
-function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
+function MiniSpectatorBoard({ player, showLetters }: { player: SpectatorPlayer; showLetters: boolean }) {
     const [revealedTiles, setRevealedTiles] = useState<Set<string>>(new Set());
     const prevRowCount = useRef(player.rows.length);
 
@@ -38,6 +38,7 @@ function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
                 const isRevealing = player.revealingRow === rowIdx;
                 const isShaking = player.shaking && isCurrentRow;
                 const states = isSubmitted ? player.rows[rowIdx] : null;
+                const word = isSubmitted ? player.guesses[rowIdx] : isCurrentRow ? player.currentWord : '';
 
                 return (
                     <div
@@ -47,6 +48,11 @@ function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
                         {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
                             const tileRevealed = revealedTiles.has(`${rowIdx}-${colIdx}`);
                             let tileClass = classes.miniTile;
+                            const letter = showLetters && word ? word[colIdx] : '';
+
+                            if (showLetters && letter) {
+                                tileClass += ` ${classes.miniTileWithLetter}`;
+                            }
 
                             if (isSubmitted && states) {
                                 if (tileRevealed || !isRevealing) {
@@ -64,7 +70,9 @@ function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
                                     key={colIdx}
                                     className={tileClass}
                                     style={isRevealing ? { animationDelay: `${colIdx * 300}ms` } : undefined}
-                                />
+                                >
+                                    {letter && <span className={classes.miniLetter}>{letter}</span>}
+                                </div>
                             );
                         })}
                     </div>
@@ -74,7 +82,7 @@ function MiniSpectatorBoard({ player }: { player: SpectatorPlayer }) {
     );
 }
 
-export default function SpectatorPanel({ players }: { players: Map<string, SpectatorPlayer> }) {
+export default function SpectatorPanel({ players, viewerFinished }: { players: Map<string, SpectatorPlayer>; viewerFinished: boolean }) {
     if (players.size === 0) return null;
 
     const sorted = Array.from(players.values()).sort((a, b) => {
@@ -98,7 +106,7 @@ export default function SpectatorPanel({ players }: { players: Map<string, Spect
                             )}
                             <Text size="xs" c={player.isOnline ? '#a6da95' : 'dimmed'} fw={player.isOnline ? 700 : 400} truncate>{player.username}</Text>
                         </div>
-                        <MiniSpectatorBoard player={player} />
+                        <MiniSpectatorBoard player={player} showLetters={viewerFinished} />
                     </div>
                 );
             })}
