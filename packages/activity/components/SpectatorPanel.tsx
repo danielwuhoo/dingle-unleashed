@@ -31,7 +31,7 @@ function MiniSpectatorBoard({ player, showLetters }: { player: SpectatorPlayer; 
     }, [player.rows.length]);
 
     return (
-        <div className={classes.miniBoard}>
+        <div className={`${classes.miniBoard} ${showLetters ? classes.miniBoardWithLetters : ''}`}>
             {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
                 const isSubmitted = rowIdx < player.rows.length;
                 const isCurrentRow = rowIdx === player.rows.length && player.gameStatus === 'playing';
@@ -49,10 +49,6 @@ function MiniSpectatorBoard({ player, showLetters }: { player: SpectatorPlayer; 
                             const tileRevealed = revealedTiles.has(`${rowIdx}-${colIdx}`);
                             let tileClass = classes.miniTile;
                             const letter = showLetters && word ? word[colIdx] : '';
-
-                            if (showLetters && letter) {
-                                tileClass += ` ${classes.miniTileWithLetter}`;
-                            }
 
                             if (isSubmitted && states) {
                                 if (tileRevealed || !isRevealing) {

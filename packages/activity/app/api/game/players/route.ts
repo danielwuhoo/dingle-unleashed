@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
             username: session.username,
             avatar: session.avatar,
             rows,
+            guesses: state.guesses,
             gameStatus: state.gameStatus,
         };
     });

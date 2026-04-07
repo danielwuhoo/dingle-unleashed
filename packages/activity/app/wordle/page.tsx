@@ -248,7 +248,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                     username: p.username,
                     avatar: p.avatar,
                     rows: p.rows,
-                    guesses: [],
+                    guesses: p.guesses ?? [],
                     currentWord: '',
                     gameStatus: p.gameStatus,
                     letterCount: 0,

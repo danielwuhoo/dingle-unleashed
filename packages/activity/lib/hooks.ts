@@ -162,6 +162,7 @@ interface PlayerInfo {
     username: string;
     avatar: string | null;
     rows: LetterState[][];
+    guesses: string[];
     gameStatus: 'playing' | 'won' | 'lost';
 }
 
