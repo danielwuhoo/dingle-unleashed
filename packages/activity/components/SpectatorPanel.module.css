@@ -1,10 +1,12 @@
 .panel {
     display: flex;
     flex-direction: row;
+    align-items: center;
     gap: min(12px, 2vw);
     overflow-x: auto;
     padding: min(4px, 0.5vh) 8px;
     width: 100%;
+    flex: 1;
 }
 
 .playerCard {

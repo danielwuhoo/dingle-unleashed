@@ -2,9 +2,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-evenly;
     height: 100vh;
     height: 100dvh;
+    gap: min(8px, 1vh);
     padding: min(1rem, 1.5vh) 0 min(1rem, 1.5vh);
     max-width: 500px;
     margin: 0 auto;
