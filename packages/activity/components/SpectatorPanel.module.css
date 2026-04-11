@@ -7,6 +7,14 @@
     padding: min(4px, 0.5vh) 8px;
     width: 100%;
     flex: 1;
+    min-height: 0;
+    container-type: size;
+}
+
+/* Tile size: derived from panel height, capped at 14px */
+/* 100cqh minus ~33px (header + gaps + padding), divided by 6 rows */
+.panel {
+    --tile-size: min(calc((100cqh - 33px) / 6), 14px);
 }
 
 .playerCard {
@@ -66,8 +74,8 @@
 }
 
 .miniTile {
-    width: min(7px, 1vh);
-    height: min(7px, 1vh);
+    width: var(--tile-size);
+    height: var(--tile-size);
     border-radius: 1px;
     background-color: transparent;
     border: 1px solid #5b6078;
@@ -78,12 +86,11 @@
 }
 
 .miniBoardWithLetters .miniTile {
-    width: min(12px, 1.6vh);
-    height: min(12px, 1.6vh);
+    --tile-size: min(calc((100cqh - 33px) / 6), 14px);
 }
 
 .miniLetter {
-    font-size: min(7px, 1vh);
+    font-size: calc(var(--tile-size) * 0.65);
     font-weight: 700;
     text-transform: uppercase;
     line-height: 1;
