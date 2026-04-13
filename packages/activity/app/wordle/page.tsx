@@ -81,6 +81,8 @@ function PastView({ userId, date, isLoading: authLoading }: { userId: string | u
             puzzleNumber={pastGame.puzzleNumber}
             gameStatus={pastGame.gameStatus}
             backHref="/history"
+            date={date}
+            userId={userId}
         />
     );
 }
@@ -132,14 +134,41 @@ function LiveView({ auth, isLoading: authLoading }: { auth: any; isLoading: bool
     );
 }
 
-function ReadOnlyBoard({ guesses, solution, puzzleNumber, gameStatus, backHref }: {
+function ReadOnlyBoard({ guesses, solution, puzzleNumber, gameStatus, backHref, date, userId }: {
     guesses: string[];
     solution: string;
     puzzleNumber: number;
     gameStatus: GameStatus;
     backHref: string;
+    date: string;
+    userId: string | undefined;
 }) {
     const keyboardStates = getKeyboardStates(guesses, solution);
+    const [panelVisible, setPanelVisible] = useState(true);
+    const { data: dbPlayers } = useAllPlayers(date);
+
+    const players = useMemo(() => {
+        const merged = new Map<string, SpectatorPlayer>();
+        if (dbPlayers) {
+            for (const p of dbPlayers) {
+                if (p.userId === userId) continue;
+                merged.set(p.userId, {
+                    userId: p.userId,
+                    username: p.username,
+                    avatar: p.avatar,
+                    rows: p.rows,
+                    guesses: p.guesses ?? [],
+                    currentWord: '',
+                    gameStatus: p.gameStatus,
+                    letterCount: 0,
+                    shaking: false,
+                    revealingRow: null,
+                    isOnline: false,
+                });
+            }
+        }
+        return merged;
+    }, [dbPlayers, userId]);
 
     return (
         <div className={classes.container}>
@@ -148,7 +177,14 @@ function ReadOnlyBoard({ guesses, solution, puzzleNumber, gameStatus, backHref }
                     <span style={{ fontSize: '1rem' }}>&#8592;</span>
                 </ActionIcon>
                 <Text size="sm" c="dimmed" fw={600}>#{puzzleNumber}</Text>
-                <div style={{ width: 22 }} />
+                <ActionIcon
+                    onClick={() => setPanelVisible((v) => !v)}
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                >
+                    <span style={{ fontSize: '0.9rem' }}>{panelVisible ? '👁' : '👁‍🗨'}</span>
+                </ActionIcon>
             </div>
 
             <div className={classes.grid}>
@@ -182,6 +218,8 @@ function ReadOnlyBoard({ guesses, solution, puzzleNumber, gameStatus, backHref }
             {gameStatus === 'lost' && (
                 <Text size="md" c="dimmed" tt="uppercase" ta="center">{solution}</Text>
             )}
+
+            {panelVisible && <SpectatorPanel players={players} viewerFinished={true} />}
 
             <div className={classes.keyboard}>
                 {KEYBOARD_ROWS.map((row, rowIdx) => (
@@ -224,6 +262,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
     const [revealedTiles, setRevealedTiles] = useState<Set<string>>(new Set());
     const [shakeRow, setShakeRow] = useState<number | null>(null);
     const [modalOpen, setModalOpen] = useState(initialStatus !== 'playing');
+    const [panelVisible, setPanelVisible] = useState(true);
 
     const submitGuessMutation = useSubmitGuess();
     const isDev = process.env.NODE_ENV === 'development';
@@ -351,7 +390,14 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                     <span style={{ fontSize: '1rem' }}>&#8592;</span>
                 </ActionIcon>
                 <Text size="sm" c="dimmed" fw={600}>#{puzzleNumber}</Text>
-                <div style={{ width: 22 }} />
+                <ActionIcon
+                    onClick={() => setPanelVisible((v) => !v)}
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                >
+                    <span style={{ fontSize: '0.9rem' }}>{panelVisible ? '👁' : '👁‍🗨'}</span>
+                </ActionIcon>
             </div>
 
             <Modal
@@ -424,7 +470,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 })}
             </div>
 
-            <SpectatorPanel players={players} viewerFinished={gameStatus !== 'playing'} />
+            {panelVisible && <SpectatorPanel players={players} viewerFinished={gameStatus !== 'playing'} />}
 
             <div className={classes.keyboard}>
                 {KEYBOARD_ROWS.map((row, rowIdx) => (
