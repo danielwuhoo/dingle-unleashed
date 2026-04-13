@@ -143,7 +143,7 @@ function ReadOnlyBoard({ guesses, solution, puzzleNumber, gameStatus, backHref }
 
     return (
         <div className={classes.container}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
+            <div className={classes.header}>
                 <ActionIcon component={Link} href={backHref} variant="subtle" color="gray" size="sm">
                     <span style={{ fontSize: '1rem' }}>&#8592;</span>
                 </ActionIcon>
@@ -346,7 +346,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
 
     return (
         <div className={classes.container}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
+            <div className={classes.header}>
                 <ActionIcon component={Link} href="/" variant="subtle" color="gray" size="sm">
                     <span style={{ fontSize: '1rem' }}>&#8592;</span>
                 </ActionIcon>

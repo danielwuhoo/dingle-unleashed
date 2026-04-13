@@ -2,19 +2,16 @@
     display: flex;
     flex-direction: row;
     align-items: center;
+    justify-content: safe center;
     gap: min(12px, 2vw);
     overflow-x: auto;
-    padding: min(4px, 0.5vh) 8px;
+    padding: 0 8px;
     width: 100%;
-    flex: 1;
-    min-height: 0;
-    container-type: size;
+    min-height: min(140px, 20vh);
 }
 
-/* Tile size: derived from panel height, capped at 14px */
-/* 100cqh minus ~33px (header + gaps + padding), divided by 6 rows */
 .panel {
-    --tile-size: min(calc((100cqh - 33px) / 6), 14px);
+    --tile-size: max(10px, min(2vh, 16px));
 }
 
 .playerCard {
@@ -86,7 +83,7 @@
 }
 
 .miniBoardWithLetters .miniTile {
-    --tile-size: min(calc((100cqh - 33px) / 6), 14px);
+    --tile-size: max(10px, min(2vh, 16px));
 }
 
 .miniLetter {

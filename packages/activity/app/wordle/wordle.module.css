@@ -2,13 +2,22 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     height: 100vh;
     height: 100dvh;
-    padding: min(1rem, 1.5vh) 0 min(1rem, 1.5vh);
+    padding: min(1rem, 1.5vh);
     max-width: 500px;
     margin: 0 auto;
     width: 100%;
+    gap: 8px;
     overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
 }
 
 .endgameGif {
@@ -43,7 +52,7 @@
 
 /* Tiles — square, scales with viewport */
 .tile {
-    width: min(58px, 16vw, 8vh);
+    width: min(50px, 14vw, 7vh);
     aspect-ratio: 1;
     display: flex;
     align-items: center;
@@ -108,7 +117,7 @@
     flex-direction: column;
     gap: min(6px, 0.8vh);
     margin-top: min(8px, 1vh);
-    padding: 0 4px min(1rem, 1.5vh);
+    padding: 0 16px min(1rem, 1.5vh);
     width: 100%;
 }
 
@@ -119,8 +128,8 @@
 }
 
 .key {
-    height: min(52px, 5vh);
-    min-width: min(32px, 8vw);
+    height: min(58px, 6vh);
+    min-width: min(40px, 9vw);
     padding: 0 6px;
     border-radius: 4px;
     border: none;
@@ -143,7 +152,7 @@
 }
 
 .wideKey {
-    min-width: min(56px, 14vw);
+    min-width: min(64px, 15vw);
     font-size: min(0.75rem, 1.2vh);
 }
 
