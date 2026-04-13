@@ -181,6 +181,10 @@ export function getHistory(userId: string): HistoryEntry[] {
 try { db.exec('ALTER TABLE wordle_sessions ADD COLUMN username TEXT NOT NULL DEFAULT \'\''); } catch {}
 try { db.exec('ALTER TABLE wordle_sessions ADD COLUMN avatar TEXT'); } catch {}
 
+// Migration: add distribution columns to wordle_puzzles
+try { db.exec('ALTER TABLE wordle_puzzles ADD COLUMN cumulative TEXT'); } catch {}
+try { db.exec('ALTER TABLE wordle_puzzles ADD COLUMN individual TEXT'); } catch {}
+
 interface SessionRow {
     id: number;
     user_id: string;
@@ -275,4 +279,103 @@ export function getDailySummary(puzzleNumber: number): DailySummaryRow[] {
         guessCount: r.guess_count,
         won: r.solved === 1,
     }));
+}
+
+// Distributions
+
+export function updatePuzzleDistribution(puzzleNumber: number, cumulative: number[], individual: number[]): void {
+    db.prepare(
+        'UPDATE wordle_puzzles SET cumulative = ?, individual = ? WHERE puzzle_number = ?',
+    ).run(JSON.stringify(cumulative), JSON.stringify(individual), puzzleNumber);
+}
+
+// Leaderboard
+
+interface LeaderboardGameRow {
+    user_id: string;
+    puzzle_number: number;
+    guess_count: number;
+    solved: number;
+    cumulative: string | null;
+    individual: string | null;
+}
+
+interface LeaderboardUserRow {
+    user_id: string;
+    username: string;
+    avatar: string | null;
+}
+
+export interface LeaderboardEntry {
+    userId: string;
+    username: string;
+    avatar: string | null;
+    avgPercentile: number;
+    games: number;
+}
+
+import { getPercentile, getFallbackPercentile } from './puzzle-data';
+
+export function getLeaderboard(dateCutoff: string | null, minGames: number): LeaderboardEntry[] {
+    const query = dateCutoff
+        ? `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
+                  p.cumulative, p.individual
+           FROM wordle_guesses g
+           JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
+           WHERE p.puzzle_date >= ?
+           GROUP BY g.user_id, g.puzzle_number
+           HAVING solved = 1 OR guess_count >= 6`
+        : `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
+                  p.cumulative, p.individual
+           FROM wordle_guesses g
+           JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
+           GROUP BY g.user_id, g.puzzle_number
+           HAVING solved = 1 OR guess_count >= 6`;
+
+    const gameRows = (dateCutoff
+        ? db.prepare(query).all(dateCutoff)
+        : db.prepare(query).all()) as LeaderboardGameRow[];
+
+    // Group by user, compute average percentile
+    const userGames = new Map<string, number[]>();
+    for (const row of gameRows) {
+        let percentile: number;
+        if (row.cumulative && row.individual) {
+            const cumulative = JSON.parse(row.cumulative) as number[];
+            const individual = JSON.parse(row.individual) as number[];
+            const guesses = row.solved ? row.guess_count : 7;
+            percentile = getPercentile(cumulative, individual, guesses);
+        } else {
+            const guesses = row.solved ? row.guess_count : 7;
+            percentile = getFallbackPercentile(guesses);
+        }
+
+        const existing = userGames.get(row.user_id) || [];
+        existing.push(percentile);
+        userGames.set(row.user_id, existing);
+    }
+
+    // Filter by min games and compute averages
+    const entries: LeaderboardEntry[] = [];
+    for (const [userId, percentiles] of userGames) {
+        if (percentiles.length < minGames) continue;
+
+        const avg = percentiles.reduce((a, b) => a + b, 0) / percentiles.length;
+
+        // Get latest username/avatar from sessions
+        const userRow = db.prepare(
+            'SELECT user_id, username, avatar FROM wordle_sessions WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+        ).get(userId) as LeaderboardUserRow | undefined;
+
+        entries.push({
+            userId,
+            username: userRow?.username || userId,
+            avatar: userRow?.avatar || null,
+            avgPercentile: Math.round(avg * 10) / 10,
+            games: percentiles.length,
+        });
+    }
+
+    entries.sort((a, b) => a.avgPercentile - b.avgPercentile);
+    return entries;
 }

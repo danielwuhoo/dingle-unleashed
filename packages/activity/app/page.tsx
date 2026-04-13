@@ -54,9 +54,14 @@ export default function Home() {
                 >
                     {buttonText}
                 </Button>
-                <Text component={Link} href="/history" size="sm" c="dimmed" td="underline">
-                    history
-                </Text>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <Text component={Link} href="/history" size="sm" c="dimmed" td="underline">
+                        history
+                    </Text>
+                    <Text component={Link} href="/leaderboard" size="sm" c="dimmed" td="underline">
+                        leaderboard
+                    </Text>
+                </div>
             </Stack>
         </div>
     );

@@ -200,6 +200,24 @@ export function usePastGame(userId: string | undefined, date: string | undefined
     });
 }
 
+export interface LeaderboardEntry {
+    userId: string;
+    username: string;
+    avatar: string | null;
+    avgPercentile: number;
+    games: number;
+}
+
+export function useLeaderboard(timeWindow: string) {
+    return useQuery({
+        queryKey: ['leaderboard', timeWindow],
+        queryFn: async (): Promise<LeaderboardEntry[]> => {
+            const res = await fetch(`/api/leaderboard?window=${timeWindow}`);
+            return res.json();
+        },
+    });
+}
+
 interface HistoryEntry {
     puzzleDate: string;
     puzzleNumber: number;

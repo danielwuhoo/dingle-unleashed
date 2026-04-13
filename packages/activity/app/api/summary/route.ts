@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPuzzleByDate, getDailySummary } from '@/lib/db';
+import { getPuzzleByDate, getDailySummary, updatePuzzleDistribution } from '@/lib/db';
 import { buildSummaryEmbed, postMessage } from '@/lib/discord-api';
+import { fetchDistributions } from '@/lib/puzzle-data';
 
 const WORDLE_CHANNEL_ID = process.env.DISCORD_WORDLE_CHANNEL_ID;
 const SUMMARY_SECRET = process.env.SUMMARY_SECRET;
@@ -37,6 +38,18 @@ export async function POST(request: NextRequest) {
     const results = getDailySummary(puzzle.puzzleNumber);
     const embed = buildSummaryEmbed(puzzle.puzzleNumber, results);
     const messageId = await postMessage(WORDLE_CHANNEL_ID, embed);
+
+    // Fetch and store distribution data for this puzzle
+    try {
+        const distributions = await fetchDistributions();
+        const dist = distributions.get(puzzle.puzzleNumber);
+        if (dist) {
+            updatePuzzleDistribution(puzzle.puzzleNumber, dist.cumulative, dist.individual);
+            console.log(`[Summary] Stored distribution for puzzle #${puzzle.puzzleNumber}`);
+        }
+    } catch (error) {
+        console.warn('[Summary] Failed to fetch/store distributions:', error);
+    }
 
     return NextResponse.json({
         ok: true,
