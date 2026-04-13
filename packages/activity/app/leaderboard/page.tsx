@@ -99,6 +99,9 @@ export default function LeaderboardPage() {
                                 <div className={classes.stats}>
                                     <span className={classes.percentile}>{ordinal(entry.avgPercentile)}</span>
                                     <span className={classes.games}>{entry.games} game{entry.games !== 1 ? 's' : ''}</span>
+                                    {entry.currentStreak > 0 && (
+                                        <span className={classes.streak}>🔥 {entry.currentStreak}d</span>
+                                    )}
                                 </div>
                             </div>
                         );

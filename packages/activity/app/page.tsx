@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Text, Title, Loader, Stack, Button } from '@mantine/core';
-import { useDiscordAuth, useGameState, useWordleSolution } from '@/lib/hooks';
+import { useDiscordAuth, useGameState, useWordleSolution, useStreak } from '@/lib/hooks';
 import { getTodayEST } from '@/lib/wordle';
 import { getLandingCopy } from '@/lib/landing';
 import WordleIcon from '@/components/WordleIcon';
@@ -13,6 +13,8 @@ export default function Home() {
     const { data: puzzle, isLoading: puzzleLoading } = useWordleSolution();
     const today = getTodayEST();
     const { data: gameState, isLoading: gameLoading } = useGameState(auth?.user.id, today);
+    const { data: streakData } = useStreak(auth?.user.id);
+    const streak = streakData?.streak ?? 0;
 
     if (authLoading || puzzleLoading || gameLoading) {
         return (
@@ -40,6 +42,11 @@ export default function Home() {
                 <Title order={1} className={classes.title}>Dingle</Title>
                 <WordleIcon />
                 {puzzle && <Text size="sm" c="dimmed" fw={600}>#{puzzle.puzzleNumber}</Text>}
+                {streak > 0 && (
+                    <Text size="sm" fw={700} c="#f5a97f">
+                        🔥 {streak} day streak
+                    </Text>
+                )}
                 <Stack align="center" gap={4}>
                     <Text size="xl" fw={700}>hey {name}</Text>
                     <Text size="md" c="dimmed">{subtitle}</Text>

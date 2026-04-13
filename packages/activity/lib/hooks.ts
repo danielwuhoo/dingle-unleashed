@@ -206,6 +206,7 @@ export interface LeaderboardEntry {
     avatar: string | null;
     avgPercentile: number;
     games: number;
+    currentStreak: number;
 }
 
 export function useLeaderboard(timeWindow: string) {
@@ -215,6 +216,19 @@ export function useLeaderboard(timeWindow: string) {
             const res = await fetch(`/api/leaderboard?window=${timeWindow}`);
             return res.json();
         },
+    });
+}
+
+export function useStreak(userId: string | undefined) {
+    return useQuery({
+        queryKey: ['streak', userId],
+        queryFn: async (): Promise<{ streak: number }> => {
+            const res = await fetch('/api/streak', {
+                headers: { 'x-user-id': userId! },
+            });
+            return res.json();
+        },
+        enabled: !!userId,
     });
 }
 

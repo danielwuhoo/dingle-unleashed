@@ -312,9 +312,44 @@ export interface LeaderboardEntry {
     avatar: string | null;
     avgPercentile: number;
     games: number;
+    currentStreak: number;
 }
 
 import { getPercentile, getFallbackPercentile } from './puzzle-data';
+import { getTodayEST } from './wordle';
+
+function prevDate(yyyymmdd: string): string {
+    const d = new Date(yyyymmdd + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+}
+
+export function getCurrentStreak(userId: string): number {
+    const rows = db.prepare(`
+        SELECT p.puzzle_date
+        FROM wordle_guesses g
+        JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
+        WHERE g.user_id = ?
+        GROUP BY g.puzzle_number
+        HAVING MAX(g.is_solution) = 1 OR COUNT(*) >= 6
+        ORDER BY p.puzzle_date DESC
+    `).all(userId) as { puzzle_date: string }[];
+
+    if (!rows.length) return 0;
+
+    const playedSet = new Set(rows.map((r) => r.puzzle_date));
+    const today = getTodayEST();
+
+    // Start from today if played, otherwise yesterday (grace period)
+    let cursor = playedSet.has(today) ? today : prevDate(today);
+
+    let streak = 0;
+    while (playedSet.has(cursor)) {
+        streak++;
+        cursor = prevDate(cursor);
+    }
+    return streak;
+}
 
 export function getLeaderboard(dateCutoff: string | null, minGames: number): LeaderboardEntry[] {
     const query = dateCutoff
@@ -373,6 +408,7 @@ export function getLeaderboard(dateCutoff: string | null, minGames: number): Lea
             avatar: userRow?.avatar || null,
             avgPercentile: Math.round(avg * 10) / 10,
             games: percentiles.length,
+            currentStreak: getCurrentStreak(userId),
         });
     }
 
