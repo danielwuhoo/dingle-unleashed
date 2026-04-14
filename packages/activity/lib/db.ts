@@ -185,6 +185,40 @@ try { db.exec('ALTER TABLE wordle_sessions ADD COLUMN avatar TEXT'); } catch {}
 try { db.exec('ALTER TABLE wordle_puzzles ADD COLUMN cumulative TEXT'); } catch {}
 try { db.exec('ALTER TABLE wordle_puzzles ADD COLUMN individual TEXT'); } catch {}
 
+// User settings
+db.exec(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+        user_id TEXT PRIMARY KEY,
+        colorblind INTEGER NOT NULL DEFAULT 0,
+        light_mode INTEGER NOT NULL DEFAULT 0
+    );
+`);
+
+export interface UserSettings {
+    colorblind: boolean;
+    lightMode: boolean;
+}
+
+export function getUserSettings(userId: string): UserSettings {
+    const row = db.prepare('SELECT colorblind, light_mode FROM user_settings WHERE user_id = ?')
+        .get(userId) as { colorblind: number; light_mode: number } | undefined;
+    return {
+        colorblind: row?.colorblind === 1,
+        lightMode: row?.light_mode === 1,
+    };
+}
+
+export function updateUserSettings(userId: string, settings: Partial<UserSettings>): UserSettings {
+    const current = getUserSettings(userId);
+    const colorblind = settings.colorblind ?? current.colorblind;
+    const lightMode = settings.lightMode ?? current.lightMode;
+    db.prepare(
+        `INSERT INTO user_settings (user_id, colorblind, light_mode) VALUES (?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET colorblind = excluded.colorblind, light_mode = excluded.light_mode`,
+    ).run(userId, colorblind ? 1 : 0, lightMode ? 1 : 0);
+    return { colorblind, lightMode };
+}
+
 interface SessionRow {
     id: number;
     user_id: string;

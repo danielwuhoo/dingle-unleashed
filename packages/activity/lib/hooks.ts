@@ -219,6 +219,47 @@ export function useLeaderboard(timeWindow: string) {
     });
 }
 
+export interface UserSettings {
+    colorblind: boolean;
+    lightMode: boolean;
+}
+
+export function useSettings(userId: string | undefined) {
+    return useQuery({
+        queryKey: ['settings', userId],
+        queryFn: async (): Promise<UserSettings> => {
+            const res = await fetch('/api/settings', {
+                headers: { 'x-user-id': userId! },
+            });
+            return res.json();
+        },
+        enabled: !!userId,
+        staleTime: Infinity,
+    });
+}
+
+export function useUpdateSettings() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (params: { userId: string; colorblind?: boolean; lightMode?: boolean }): Promise<UserSettings> => {
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: params.userId,
+                    colorblind: params.colorblind,
+                    lightMode: params.lightMode,
+                }),
+            });
+            return res.json();
+        },
+        onSuccess: (data, variables) => {
+            queryClient.setQueryData(['settings', variables.userId], data);
+        },
+    });
+}
+
 export function useStreak(userId: string | undefined) {
     return useQuery({
         queryKey: ['streak', userId],

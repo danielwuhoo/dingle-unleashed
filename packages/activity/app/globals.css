@@ -1,0 +1,11 @@
+:root {
+    --color-correct: #a6da95;
+    --color-present: #eed49f;
+    --color-absent: #6e738d;
+    --color-bg: #24273a;
+    --color-surface: #363a4f;
+    --color-text: #cad3f5;
+    --color-text-dimmed: #8087a2;
+    --color-border: #5b6078;
+    --color-key-bg: #5b6078;
+}

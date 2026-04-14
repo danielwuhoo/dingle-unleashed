@@ -58,19 +58,19 @@
     width: 8px;
     aspect-ratio: 1;
     border-radius: 1px;
-    background-color: #363a4f;
+    background-color: var(--color-surface);
 }
 
 .correct {
-    background-color: #a6da95;
+    background-color: var(--color-correct);
 }
 
 .present {
-    background-color: #eed49f;
+    background-color: var(--color-present);
 }
 
 .absent {
-    background-color: #6e738d;
+    background-color: var(--color-absent);
 }
 
 @media (max-width: 450px) {

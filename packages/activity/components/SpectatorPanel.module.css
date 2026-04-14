@@ -40,12 +40,12 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background-color: #5b6078;
+    background-color: var(--color-border);
     flex-shrink: 0;
 }
 
 .avatarOnline {
-    outline: 2px solid #a6da95;
+    outline: 2px solid var(--color-correct);
     outline-offset: -1px;
 }
 
@@ -75,7 +75,7 @@
     height: var(--tile-size);
     border-radius: 1px;
     background-color: transparent;
-    border: 1px solid #5b6078;
+    border: 1px solid var(--color-border);
     box-sizing: border-box;
     display: flex;
     align-items: center;
@@ -91,7 +91,7 @@
     font-weight: 700;
     text-transform: uppercase;
     line-height: 1;
-    color: #cad3f5;
+    color: var(--color-text);
 }
 
 .correct .miniLetter,
@@ -100,8 +100,8 @@
 }
 
 .miniTyping {
-    background-color: #5b6078;
-    border-color: #8087a2;
+    background-color: var(--color-border);
+    border-color: var(--color-text-dimmed);
 }
 
 .miniReveal {
@@ -115,16 +115,16 @@
 }
 
 .correct {
-    background-color: #a6da95;
-    border-color: #a6da95;
+    background-color: var(--color-correct);
+    border-color: var(--color-correct);
 }
 
 .present {
-    background-color: #eed49f;
-    border-color: #eed49f;
+    background-color: var(--color-present);
+    border-color: var(--color-present);
 }
 
 .absent {
-    background-color: #6e738d;
-    border-color: #6e738d;
+    background-color: var(--color-absent);
+    border-color: var(--color-absent);
 }

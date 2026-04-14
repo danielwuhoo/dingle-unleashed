@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Text, Title, Loader, Stack, Button } from '@mantine/core';
+import { Text, Title, Loader, Stack, Button, Modal, Switch } from '@mantine/core';
 import { useDiscordAuth, useGameState, useWordleSolution, useStreak } from '@/lib/hooks';
+import { useSettingsContext } from '@/lib/settings-context';
 import { getTodayEST } from '@/lib/wordle';
 import { getLandingCopy } from '@/lib/landing';
 import WordleIcon from '@/components/WordleIcon';
@@ -15,6 +17,8 @@ export default function Home() {
     const { data: gameState, isLoading: gameLoading } = useGameState(auth?.user.id, today);
     const { data: streakData } = useStreak(auth?.user.id);
     const streak = streakData?.streak ?? 0;
+    const { colorblind, lightMode, setColorblind, setLightMode } = useSettingsContext();
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     if (authLoading || puzzleLoading || gameLoading) {
         return (
@@ -38,6 +42,28 @@ export default function Home() {
 
     return (
         <div className={classes.container}>
+            <Modal
+                opened={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                centered
+                withCloseButton
+                size="xs"
+                title="Settings"
+            >
+                <Stack gap="md">
+                    <Switch
+                        label="Colorblind mode"
+                        checked={colorblind}
+                        onChange={(e) => setColorblind(e.currentTarget.checked)}
+                    />
+                    <Switch
+                        label="Light mode"
+                        checked={lightMode}
+                        onChange={(e) => setLightMode(e.currentTarget.checked)}
+                    />
+                </Stack>
+            </Modal>
+
             <Stack align="center" gap="lg" className={classes.content}>
                 <Title order={1} className={classes.title}>Dingle</Title>
                 <WordleIcon />
@@ -67,6 +93,9 @@ export default function Home() {
                     </Text>
                     <Text component={Link} href="/leaderboard" size="sm" c="dimmed" td="underline">
                         leaderboard
+                    </Text>
+                    <Text size="sm" c="dimmed" td="underline" style={{ cursor: 'pointer' }} onClick={() => setSettingsOpen(true)}>
+                        settings
                     </Text>
                 </div>
             </Stack>

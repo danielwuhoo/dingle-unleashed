@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css';
+import './globals.css';
 import Providers from '@/lib/providers';
 import { ColorSchemeScript } from '@mantine/core';
 import { Libre_Franklin, Arvo } from 'next/font/google';

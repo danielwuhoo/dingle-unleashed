@@ -1,13 +1,9 @@
 import classes from '@/app/page.module.css';
 
-const GREEN = '#a6da95';
-const YELLOW = '#eed49f';
-const SURFACE = '#5b6078';
-
-const COLORS = [
-    [SURFACE, YELLOW, SURFACE],
-    [SURFACE, YELLOW, SURFACE],
-    [GREEN, YELLOW, GREEN],
+const PATTERN = [
+    ['surface', 'present', 'surface'],
+    ['surface', 'present', 'surface'],
+    ['correct', 'present', 'correct'],
 ];
 
 export default function WordleIcon() {
@@ -17,19 +13,26 @@ export default function WordleIcon() {
 
     return (
         <svg className={classes.icon} viewBox={`0 0 ${size} ${size}`}>
-            <rect width={size} height={size} rx={12} fill="none" stroke={SURFACE} strokeWidth={3} />
-            {COLORS.map((row, r) =>
-                row.map((color, c) => (
-                    <rect
-                        key={`${r}-${c}`}
-                        x={gap + c * (cellSize + gap)}
-                        y={gap + r * (cellSize + gap)}
-                        width={cellSize}
-                        height={cellSize}
-                        rx={4}
-                        fill={color}
-                    />
-                ))
+            <rect width={size} height={size} rx={12} fill="none" stroke="var(--color-border)" strokeWidth={3} />
+            {PATTERN.map((row, r) =>
+                row.map((type, c) => {
+                    const fill = type === 'correct'
+                        ? 'var(--color-correct)'
+                        : type === 'present'
+                            ? 'var(--color-present)'
+                            : 'var(--color-border)';
+                    return (
+                        <rect
+                            key={`${r}-${c}`}
+                            x={gap + c * (cellSize + gap)}
+                            y={gap + r * (cellSize + gap)}
+                            width={cellSize}
+                            height={cellSize}
+                            rx={4}
+                            fill={fill}
+                        />
+                    );
+                })
             )}
         </svg>
     );

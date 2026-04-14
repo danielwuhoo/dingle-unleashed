@@ -60,14 +60,14 @@
     font-size: min(2rem, 5.5vw, 2.8vh);
     font-weight: 700;
     text-transform: uppercase;
-    border: 2px solid #5b6078;
-    color: #cad3f5;
+    border: 2px solid var(--color-border);
+    color: var(--color-text);
     box-sizing: border-box;
     user-select: none;
 }
 
 .tile.filled {
-    border-color: #8087a2;
+    border-color: var(--color-text-dimmed);
     animation: pop 0.1s ease;
 }
 
@@ -77,21 +77,21 @@
 
 /* Revealed tile colors — only applied after flip midpoint via .revealed */
 .tile.correct.revealed {
-    background-color: #a6da95;
-    border-color: #a6da95;
+    background-color: var(--color-correct);
+    border-color: var(--color-correct);
     color: #24273a;
 }
 
 .tile.present.revealed {
-    background-color: #eed49f;
-    border-color: #eed49f;
+    background-color: var(--color-present);
+    border-color: var(--color-present);
     color: #24273a;
 }
 
 .tile.absent.revealed {
-    background-color: #6e738d;
-    border-color: #6e738d;
-    color: #cad3f5;
+    background-color: var(--color-absent);
+    border-color: var(--color-absent);
+    color: var(--color-text);
 }
 
 /* Flip reveal animation */
@@ -133,8 +133,8 @@
     padding: 0 6px;
     border-radius: 4px;
     border: none;
-    background-color: #5b6078;
-    color: #cad3f5;
+    background-color: var(--color-key-bg);
+    color: var(--color-text);
     font-size: min(0.85rem, 1.5vh);
     font-weight: 600;
     text-transform: uppercase;
@@ -157,18 +157,18 @@
 }
 
 .key.correct {
-    background-color: #a6da95;
+    background-color: var(--color-correct);
     color: #24273a;
 }
 
 .key.present {
-    background-color: #eed49f;
+    background-color: var(--color-present);
     color: #24273a;
 }
 
 .key.absent {
-    background-color: #363a4f;
-    color: #8087a2;
+    background-color: var(--color-surface);
+    color: var(--color-text-dimmed);
 }
 
 /* Mobile — more top padding */
