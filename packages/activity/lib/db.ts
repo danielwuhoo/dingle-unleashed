@@ -315,6 +315,85 @@ export function getDailySummary(puzzleNumber: number): DailySummaryRow[] {
     }));
 }
 
+// Day Results (for Today/Yesterday leaderboard views)
+
+export interface DayPlayer {
+    userId: string;
+    username: string;
+    avatar: string | null;
+}
+
+export interface DayGroup {
+    guessCount: number;
+    percentile?: number;
+    players: DayPlayer[];
+}
+
+export function getDayResults(date: string, includePercentile: boolean): DayGroup[] {
+    const gameRows = db.prepare(`
+        SELECT g.user_id, COUNT(*) as guess_count, MAX(g.is_solution) as solved
+        FROM wordle_guesses g
+        JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
+        WHERE p.puzzle_date = ?
+        GROUP BY g.user_id
+        HAVING solved = 1 OR guess_count >= 6
+    `).all(date) as { user_id: string; guess_count: number; solved: number }[];
+
+    // Group by effective guess count (7 = failed)
+    const groups = new Map<number, DayPlayer[]>();
+    for (const row of gameRows) {
+        const effectiveGuesses = row.solved ? row.guess_count : 7;
+
+        const userRow = db.prepare(
+            'SELECT username, avatar FROM wordle_sessions WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+        ).get(row.user_id) as { username: string; avatar: string | null } | undefined;
+
+        const player: DayPlayer = {
+            userId: row.user_id,
+            username: userRow?.username || row.user_id,
+            avatar: userRow?.avatar || null,
+        };
+
+        const existing = groups.get(effectiveGuesses) || [];
+        existing.push(player);
+        groups.set(effectiveGuesses, existing);
+    }
+
+    // Build result ordered 1→6→7
+    const result: DayGroup[] = [];
+    let puzzleDist: { cumulative: number[]; individual: number[] } | null = null;
+
+    if (includePercentile) {
+        const puzzle = db.prepare(
+            'SELECT cumulative, individual FROM wordle_puzzles WHERE puzzle_date = ?',
+        ).get(date) as { cumulative: string | null; individual: string | null } | undefined;
+
+        if (puzzle?.cumulative && puzzle?.individual) {
+            puzzleDist = {
+                cumulative: JSON.parse(puzzle.cumulative),
+                individual: JSON.parse(puzzle.individual),
+            };
+        }
+    }
+
+    for (const guessCount of [1, 2, 3, 4, 5, 6, 7]) {
+        const players = groups.get(guessCount);
+        if (!players || players.length === 0) continue;
+
+        const group: DayGroup = { guessCount, players };
+
+        if (includePercentile && puzzleDist) {
+            group.percentile = Math.round(
+                getPercentile(puzzleDist.cumulative, puzzleDist.individual, guessCount) * 10,
+            ) / 10;
+        }
+
+        result.push(group);
+    }
+
+    return result;
+}
+
 // Distributions
 
 export function updatePuzzleDistribution(puzzleNumber: number, cumulative: number[], individual: number[]): void {

@@ -209,10 +209,26 @@ export interface LeaderboardEntry {
     currentStreak: number;
 }
 
+export interface DayPlayer {
+    userId: string;
+    username: string;
+    avatar: string | null;
+}
+
+export interface DayGroup {
+    guessCount: number;
+    percentile?: number;
+    players: DayPlayer[];
+}
+
+export type LeaderboardResponse =
+    | { type: 'daily'; date: string; groups: DayGroup[] }
+    | { type: 'ranked'; entries: LeaderboardEntry[] };
+
 export function useLeaderboard(timeWindow: string) {
     return useQuery({
         queryKey: ['leaderboard', timeWindow],
-        queryFn: async (): Promise<LeaderboardEntry[]> => {
+        queryFn: async (): Promise<LeaderboardResponse> => {
             const res = await fetch(`/api/leaderboard?window=${timeWindow}`);
             return res.json();
         },

@@ -4,11 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Loader, Stack, Text, ActionIcon } from '@mantine/core';
 
-import { useDiscordAuth, useLeaderboard } from '@/lib/hooks';
+import { useDiscordAuth, useLeaderboard, LeaderboardResponse, LeaderboardEntry, DayGroup } from '@/lib/hooks';
 import classes from './leaderboard.module.css';
 
 const TIME_WINDOWS = [
-    { key: '1d', label: '1D' },
+    { key: 'today', label: 'Today' },
+    { key: 'yesterday', label: 'Yesterday' },
     { key: '1w', label: '1W' },
     { key: '1m', label: '1M' },
     { key: '3m', label: '3M' },
@@ -30,10 +31,106 @@ function ordinal(n: number): string {
     return rounded + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
+function DailyView({ groups, currentUserId }: { groups: DayGroup[]; currentUserId?: string }) {
+    if (groups.length === 0) {
+        return (
+            <Stack align="center" justify="center" flex={1}>
+                <Text c="dimmed">no results yet</Text>
+            </Stack>
+        );
+    }
+
+    return (
+        <div className={classes.groups}>
+            {groups.map((group) => (
+                <div key={group.guessCount} className={classes.group}>
+                    <div className={classes.groupHeader}>
+                        <Text fw={700} size="sm">
+                            {group.guessCount <= 6 ? `${group.guessCount}/6` : 'X/6'}
+                        </Text>
+                        {group.percentile !== undefined && (
+                            <Text size="xs" c="dimmed">
+                                {ordinal(group.percentile)} percentile
+                            </Text>
+                        )}
+                    </div>
+                    <div className={classes.groupPlayers}>
+                        {group.players.map((player) => {
+                            const avatarUrl = getAvatarUrl(player.userId, player.avatar);
+                            const isCurrentUser = player.userId === currentUserId;
+
+                            return (
+                                <div key={player.userId} className={classes.groupPlayer}>
+                                    {avatarUrl ? (
+                                        <img
+                                            src={avatarUrl}
+                                            alt=""
+                                            className={`${classes.groupAvatar} ${isCurrentUser ? classes.groupAvatarHighlight : ''}`}
+                                        />
+                                    ) : (
+                                        <div className={`${classes.groupAvatarPlaceholder} ${isCurrentUser ? classes.groupAvatarHighlight : ''}`} />
+                                    )}
+                                    <span className={`${classes.groupName} ${isCurrentUser ? classes.groupNameHighlight : ''}`}>
+                                        {player.username}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function RankedView({ entries, currentUserId }: { entries: LeaderboardEntry[]; currentUserId?: string }) {
+    if (entries.length === 0) {
+        return (
+            <Stack align="center" justify="center" flex={1}>
+                <Text c="dimmed">no rankings yet</Text>
+            </Stack>
+        );
+    }
+
+    return (
+        <div className={classes.list}>
+            {entries.map((entry, idx) => {
+                const avatarUrl = getAvatarUrl(entry.userId, entry.avatar);
+                const isCurrentUser = entry.userId === currentUserId;
+                const rank = idx + 1;
+
+                return (
+                    <div
+                        key={entry.userId}
+                        className={`${classes.row} ${isCurrentUser ? classes.rowHighlight : ''}`}
+                    >
+                        <span className={classes.rank}>
+                            {rank <= 3 ? MEDALS[rank - 1] : rank}
+                        </span>
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt="" className={classes.avatar} />
+                        ) : (
+                            <div className={classes.avatarPlaceholder} />
+                        )}
+                        <span className={classes.name}>{entry.username}</span>
+                        <div className={classes.stats}>
+                            <span className={classes.percentile}>{ordinal(entry.avgPercentile)}</span>
+                            <span className={classes.games}>{entry.games} game{entry.games !== 1 ? 's' : ''}</span>
+                            {entry.currentStreak > 0 && (
+                                <span className={classes.streak}>🔥 {entry.currentStreak}d</span>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 export default function LeaderboardPage() {
     const { data: auth, isLoading: authLoading } = useDiscordAuth();
-    const [timeWindow, setTimeWindow] = useState('all');
-    const { data: entries, isLoading: leaderboardLoading } = useLeaderboard(timeWindow);
+    const [timeWindow, setTimeWindow] = useState('today');
+    const { data, isLoading: leaderboardLoading } = useLeaderboard(timeWindow);
 
     if (authLoading || leaderboardLoading) {
         return (
@@ -71,42 +168,20 @@ export default function LeaderboardPage() {
                 ))}
             </div>
 
-            {!entries || entries.length === 0 ? (
+            {data && (data as LeaderboardResponse).type === 'daily' ? (
+                <DailyView
+                    groups={(data as Extract<LeaderboardResponse, { type: 'daily' }>).groups}
+                    currentUserId={auth?.user.id}
+                />
+            ) : data && (data as LeaderboardResponse).type === 'ranked' ? (
+                <RankedView
+                    entries={(data as Extract<LeaderboardResponse, { type: 'ranked' }>).entries}
+                    currentUserId={auth?.user.id}
+                />
+            ) : (
                 <Stack align="center" justify="center" flex={1}>
                     <Text c="dimmed">no rankings yet</Text>
                 </Stack>
-            ) : (
-                <div className={classes.list}>
-                    {entries.map((entry, idx) => {
-                        const avatarUrl = getAvatarUrl(entry.userId, entry.avatar);
-                        const isCurrentUser = entry.userId === auth?.user.id;
-                        const rank = idx + 1;
-
-                        return (
-                            <div
-                                key={entry.userId}
-                                className={`${classes.row} ${isCurrentUser ? classes.rowHighlight : ''}`}
-                            >
-                                <span className={classes.rank}>
-                                    {rank <= 3 ? MEDALS[rank - 1] : rank}
-                                </span>
-                                {avatarUrl ? (
-                                    <img src={avatarUrl} alt="" className={classes.avatar} />
-                                ) : (
-                                    <div className={classes.avatarPlaceholder} />
-                                )}
-                                <span className={classes.name}>{entry.username}</span>
-                                <div className={classes.stats}>
-                                    <span className={classes.percentile}>{ordinal(entry.avgPercentile)}</span>
-                                    <span className={classes.games}>{entry.games} game{entry.games !== 1 ? 's' : ''}</span>
-                                    {entry.currentStreak > 0 && (
-                                        <span className={classes.streak}>🔥 {entry.currentStreak}d</span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
             )}
         </div>
     );

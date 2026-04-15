@@ -418,6 +418,9 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                         {gameStatus === 'lost' && (
                             <Text size="md" c="dimmed" tt="uppercase">{solution}</Text>
                         )}
+                        <Text component={Link} href="/leaderboard" size="sm" c="dimmed" td="underline">
+                            leaderboard
+                        </Text>
                     </Stack>
                 )}
             </Modal>
