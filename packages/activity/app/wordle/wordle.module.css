@@ -18,6 +18,7 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
+    padding: min(0.5rem, 1vh) 0;
 }
 
 .endgameGif {

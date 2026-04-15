@@ -385,25 +385,37 @@ export function getCurrentStreak(userId: string): number {
     return streak;
 }
 
-export function getLeaderboard(dateCutoff: string | null, minGames: number): LeaderboardEntry[] {
-    const query = dateCutoff
-        ? `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
+export function getLeaderboard(dateCutoff: string | null, minGames: number, exactDate?: string): LeaderboardEntry[] {
+    let query: string;
+    let gameRows: LeaderboardGameRow[];
+
+    if (exactDate) {
+        query = `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
+                  p.cumulative, p.individual
+           FROM wordle_guesses g
+           JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
+           WHERE p.puzzle_date = ?
+           GROUP BY g.user_id, g.puzzle_number
+           HAVING solved = 1 OR guess_count >= 6`;
+        gameRows = db.prepare(query).all(exactDate) as LeaderboardGameRow[];
+    } else if (dateCutoff) {
+        query = `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
                   p.cumulative, p.individual
            FROM wordle_guesses g
            JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
            WHERE p.puzzle_date >= ?
            GROUP BY g.user_id, g.puzzle_number
-           HAVING solved = 1 OR guess_count >= 6`
-        : `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
+           HAVING solved = 1 OR guess_count >= 6`;
+        gameRows = db.prepare(query).all(dateCutoff) as LeaderboardGameRow[];
+    } else {
+        query = `SELECT g.user_id, g.puzzle_number, COUNT(*) as guess_count, MAX(g.is_solution) as solved,
                   p.cumulative, p.individual
            FROM wordle_guesses g
            JOIN wordle_puzzles p ON p.puzzle_number = g.puzzle_number
            GROUP BY g.user_id, g.puzzle_number
            HAVING solved = 1 OR guess_count >= 6`;
-
-    const gameRows = (dateCutoff
-        ? db.prepare(query).all(dateCutoff)
-        : db.prepare(query).all()) as LeaderboardGameRow[];
+        gameRows = db.prepare(query).all() as LeaderboardGameRow[];
+    }
 
     // Group by user, compute average percentile
     const userGames = new Map<string, number[]>();

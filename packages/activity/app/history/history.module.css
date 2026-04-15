@@ -17,7 +17,7 @@
     top: 0;
     z-index: 10;
     background-color: var(--mantine-color-body);
-    padding: min(1rem, 1.5vh) 0;
+    padding: min(1.5rem, 2.5vh) 0;
 }
 
 /* Mobile — more top padding */
