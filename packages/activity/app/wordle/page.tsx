@@ -385,7 +385,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
         const revealDuration = WORD_LENGTH * 300 + 500;
         setTimeout(() => {
             setRevealingRow(null);
-            if (currentGuess === solution) {
+            if (fullWord === solution) {
                 setGameStatus('won');
                 setModalOpen(true);
             } else if (newGuesses.length >= MAX_GUESSES) {
