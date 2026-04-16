@@ -254,6 +254,20 @@ interface WordleGameProps {
     initialStatus: GameStatus;
 }
 
+function buildCurrentChars(typed: string, locked: Map<number, string>): string[] {
+    const chars: string[] = Array(WORD_LENGTH).fill('');
+    for (const [col, letter] of locked) {
+        chars[col] = letter;
+    }
+    let typedIdx = 0;
+    for (let i = 0; i < WORD_LENGTH; i++) {
+        if (!chars[i] && typedIdx < typed.length) {
+            chars[i] = typed[typedIdx++];
+        }
+    }
+    return chars;
+}
+
 function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, initialGuesses, initialStatus }: WordleGameProps) {
     const [guesses, setGuesses] = useState<string[]>(initialGuesses);
     const [currentGuess, setCurrentGuess] = useState('');
@@ -263,6 +277,41 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
     const [shakeRow, setShakeRow] = useState<number | null>(null);
     const [modalOpen, setModalOpen] = useState(initialStatus !== 'playing');
     const [panelVisible, setPanelVisible] = useState(true);
+    const [lockedColumns, setLockedColumns] = useState<Map<number, string>>(new Map());
+
+    const handleTileTap = useCallback((rowIdx: number, colIdx: number) => {
+        if (gameStatus !== 'playing') return;
+
+        const isCurrentRow = rowIdx === guesses.length;
+
+        // Tap a locked tile on the current row → unlock it
+        if (isCurrentRow && lockedColumns.has(colIdx)) {
+            setLockedColumns((prev) => {
+                const next = new Map(prev);
+                next.delete(colIdx);
+                return next;
+            });
+            return;
+        }
+
+        // Tap a submitted green tile → toggle lock
+        if (rowIdx >= guesses.length) return;
+        const states = getLetterStates(guesses[rowIdx], solution);
+        if (states[colIdx] !== 'correct') return;
+
+        setLockedColumns((prev) => {
+            const next = new Map(prev);
+            const letter = guesses[rowIdx][colIdx];
+            if (next.get(colIdx) === letter) {
+                next.delete(colIdx);
+            } else {
+                next.set(colIdx, letter);
+            }
+            const maxTyped = WORD_LENGTH - next.size;
+            setCurrentGuess((prev) => prev.slice(0, maxTyped));
+            return next;
+        });
+    }, [gameStatus, guesses, solution, lockedColumns]);
 
     const submitGuessMutation = useSubmitGuess();
     const isDev = process.env.NODE_ENV === 'development';
@@ -306,8 +355,10 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
     }, [dbPlayers, socketPlayers, userId]);
 
     const submitGuess = useCallback(() => {
-        if (currentGuess.length !== WORD_LENGTH) return;
-        if (!wordSet.has(currentGuess)) {
+        const fullChars = buildCurrentChars(currentGuess, lockedColumns);
+        if (fullChars.some((c) => !c)) return;
+        const fullWord = fullChars.join('');
+        if (!wordSet.has(fullWord)) {
             setShakeRow(guesses.length);
             setTimeout(() => setShakeRow(null), 250);
             emit('shake');
@@ -315,15 +366,15 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
         }
 
         const rowIndex = guesses.length;
-        const newGuesses = [...guesses, currentGuess];
+        const newGuesses = [...guesses, fullWord];
         setRevealingRow(rowIndex);
         setGuesses(newGuesses);
         setCurrentGuess('');
 
-        const newStatus = currentGuess === solution ? 'won' : newGuesses.length >= MAX_GUESSES ? 'lost' : 'playing';
-        emit('guess', { word: currentGuess, guesses: newGuesses, gameStatus: newStatus });
+        const newStatus = fullWord === solution ? 'won' : newGuesses.length >= MAX_GUESSES ? 'lost' : 'playing';
+        emit('guess', { word: fullWord, guesses: newGuesses, gameStatus: newStatus });
 
-        submitGuessMutation.mutate({ userId, date, word: currentGuess, username, avatar });
+        submitGuessMutation.mutate({ userId, date, word: fullWord, username, avatar });
 
         for (let i = 0; i < WORD_LENGTH; i++) {
             setTimeout(() => {
@@ -342,29 +393,35 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 setModalOpen(true);
             }
         }, revealDuration);
-    }, [currentGuess, guesses, solution, userId, date, submitGuessMutation]);
+    }, [currentGuess, lockedColumns, guesses, solution, userId, date, submitGuessMutation, emit]);
 
     const handleKey = useCallback((key: string) => {
         if (gameStatus !== 'playing') return;
         if (revealingRow !== null) return;
+
+        const maxTyped = WORD_LENGTH - lockedColumns.size;
 
         if (key === 'enter') {
             submitGuess();
         } else if (key === 'backspace') {
             setCurrentGuess((prev) => {
                 const next = prev.slice(0, -1);
-                emit('typing', { letterCount: next.length, currentWord: next });
+                const chars = buildCurrentChars(next, lockedColumns);
+                const word = chars.join('');
+                emit('typing', { letterCount: word.length, currentWord: word });
                 return next;
             });
         } else if (key.length === 1 && key >= 'a' && key <= 'z') {
             setCurrentGuess((prev) => {
-                if (prev.length >= WORD_LENGTH) return prev;
+                if (prev.length >= maxTyped) return prev;
                 const next = prev + key;
-                emit('typing', { letterCount: next.length, currentWord: next });
+                const chars = buildCurrentChars(next, lockedColumns);
+                const word = chars.join('');
+                emit('typing', { letterCount: word.length, currentWord: word });
                 return next;
             });
         }
-    }, [gameStatus, revealingRow, submitGuess, emit]);
+    }, [gameStatus, revealingRow, lockedColumns, submitGuess, emit]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -431,7 +488,8 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                     const isCurrentRow = rowIdx === guesses.length;
                     const isRevealing = revealingRow === rowIdx;
                     const isShaking = shakeRow === rowIdx;
-                    const word = isSubmitted ? guesses[rowIdx] : isCurrentRow ? currentGuess : '';
+                    const currentChars = isCurrentRow ? buildCurrentChars(currentGuess, lockedColumns) : null;
+                    const word = isSubmitted ? guesses[rowIdx] : '';
                     const letterStates = isSubmitted ? getLetterStates(guesses[rowIdx], solution) : null;
 
                     return (
@@ -440,10 +498,11 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                             className={`${classes.row} ${isShaking ? classes.shake : ''}`}
                         >
                             {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
-                                const letter = word[colIdx] || '';
+                                const letter = currentChars ? currentChars[colIdx] : (word[colIdx] || '');
                                 const state = letterStates?.[colIdx];
-                                const isFilled = letter !== '';
+                                const isFilled = !!letter;
                                 const tileRevealed = revealedTiles.has(`${rowIdx}-${colIdx}`);
+                                const isLocked = isCurrentRow && lockedColumns.has(colIdx);
 
                                 let tileClass = classes.tile;
                                 if (isSubmitted && state) {
@@ -454,6 +513,8 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                                     if (isRevealing) {
                                         tileClass += ` ${classes.reveal}`;
                                     }
+                                } else if (isLocked) {
+                                    tileClass += ` ${classes.filled} ${classes.tileLocked}`;
                                 } else if (isFilled) {
                                     tileClass += ` ${classes.filled}`;
                                 }
@@ -463,6 +524,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                                         key={colIdx}
                                         className={tileClass}
                                         style={isRevealing ? { animationDelay: `${colIdx * 300}ms` } : undefined}
+                                        onClick={() => handleTileTap(rowIdx, colIdx)}
                                     >
                                         <span>{letter}</span>
                                     </div>

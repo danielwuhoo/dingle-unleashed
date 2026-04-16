@@ -81,6 +81,14 @@
     background-color: var(--color-correct);
     border-color: var(--color-correct);
     color: #24273a;
+    cursor: pointer;
+}
+
+.tile.tileLocked {
+    color: var(--color-text-dimmed);
+    border-color: var(--color-text-dimmed);
+    opacity: 0.6;
+    cursor: pointer;
 }
 
 .tile.present.revealed {
