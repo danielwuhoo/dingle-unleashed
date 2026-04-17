@@ -48,7 +48,22 @@ function MiniSpectatorBoard({ player, showLetters }: { player: SpectatorPlayer; 
                         {Array.from({ length: WORD_LENGTH }).map((_, colIdx) => {
                             const tileRevealed = revealedTiles.has(`${rowIdx}-${colIdx}`);
                             let tileClass = classes.miniTile;
-                            const letter = showLetters && word ? word[colIdx] : '';
+
+                            const hasCharsArray = isCurrentRow && player.currentChars && player.currentChars.length === WORD_LENGTH;
+                            const isColFilled = hasCharsArray
+                                ? !!player.currentChars![colIdx]
+                                : isCurrentRow && colIdx < player.letterCount;
+
+                            let letter = '';
+                            if (showLetters) {
+                                if (isSubmitted) {
+                                    letter = word[colIdx] || '';
+                                } else if (hasCharsArray) {
+                                    letter = player.currentChars![colIdx] || '';
+                                } else if (isCurrentRow) {
+                                    letter = word[colIdx] || '';
+                                }
+                            }
 
                             if (isSubmitted && states) {
                                 if (tileRevealed || !isRevealing) {
@@ -57,7 +72,7 @@ function MiniSpectatorBoard({ player, showLetters }: { player: SpectatorPlayer; 
                                 if (isRevealing) {
                                     tileClass += ` ${classes.miniReveal}`;
                                 }
-                            } else if (isCurrentRow && colIdx < player.letterCount) {
+                            } else if (isColFilled) {
                                 tileClass += ` ${classes.miniTyping}`;
                             }
 

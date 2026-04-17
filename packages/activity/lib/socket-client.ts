@@ -11,6 +11,7 @@ export interface SpectatorPlayer {
     rows: LetterState[][];
     guesses: string[];
     currentWord: string;
+    currentChars?: string[];
     gameStatus: 'playing' | 'won' | 'lost';
     letterCount: number;
     shaking: boolean;
@@ -64,12 +65,12 @@ export function useSocket(options: UseSocketOptions | null) {
             });
         });
 
-        socket.on('player_typing', (data: { userId: string; letterCount: number; currentWord: string }) => {
+        socket.on('player_typing', (data: { userId: string; letterCount: number; currentWord: string; currentChars?: string[] }) => {
             setPlayers((prev) => {
                 const next = new Map(prev);
                 const player = next.get(data.userId);
                 if (player) {
-                    next.set(data.userId, { ...player, letterCount: data.letterCount, currentWord: data.currentWord });
+                    next.set(data.userId, { ...player, letterCount: data.letterCount, currentWord: data.currentWord, currentChars: data.currentChars });
                 }
                 return next;
             });
@@ -88,6 +89,7 @@ export function useSocket(options: UseSocketOptions | null) {
                         gameStatus: data.gameStatus as SpectatorPlayer['gameStatus'],
                         letterCount: 0,
                         currentWord: '',
+                        currentChars: undefined,
                         revealingRow,
                     });
 

@@ -298,6 +298,18 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
     const [panelVisible, setPanelVisible] = useState(true);
     const [lockedColumns, setLockedColumns] = useState<Map<number, string>>(new Map());
 
+    const submitGuessMutation = useSubmitGuess();
+    const isDev = process.env.NODE_ENV === 'development';
+    const socket = useSocket(isDev ? null : {
+        userId, username, avatar, date,
+        guesses: initialGuesses,
+        gameStatus: initialStatus,
+    });
+    const mock = useMockSocket();
+    const socketPlayers = isDev ? mock.players : socket.players;
+    const emit = isDev ? mock.emit : socket.emit;
+    const { data: dbPlayers } = useAllPlayers(date);
+
     const handleTileTap = useCallback((rowIdx: number, colIdx: number) => {
         if (gameStatus !== 'playing') return;
 
@@ -308,6 +320,9 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
             setLockedColumns((prev) => {
                 const next = new Map(prev);
                 next.delete(colIdx);
+                const chars = buildCurrentChars(currentGuess, next);
+                const word = chars.join('');
+                emit('typing', { letterCount: word.length, currentWord: word, currentChars: chars });
                 return next;
             });
             return;
@@ -327,22 +342,16 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 next.set(colIdx, letter);
             }
             const maxTyped = WORD_LENGTH - next.size;
-            setCurrentGuess((prev) => prev.slice(0, maxTyped));
+            setCurrentGuess((prevTyped) => {
+                const truncated = prevTyped.slice(0, maxTyped);
+                const chars = buildCurrentChars(truncated, next);
+                const word = chars.join('');
+                emit('typing', { letterCount: word.length, currentWord: word, currentChars: chars });
+                return truncated;
+            });
             return next;
         });
-    }, [gameStatus, guesses, solution, lockedColumns]);
-
-    const submitGuessMutation = useSubmitGuess();
-    const isDev = process.env.NODE_ENV === 'development';
-    const socket = useSocket(isDev ? null : {
-        userId, username, avatar, date,
-        guesses: initialGuesses,
-        gameStatus: initialStatus,
-    });
-    const mock = useMockSocket();
-    const socketPlayers = isDev ? mock.players : socket.players;
-    const emit = isDev ? mock.emit : socket.emit;
-    const { data: dbPlayers } = useAllPlayers(date);
+    }, [gameStatus, guesses, solution, lockedColumns, currentGuess, emit]);
 
     const players = useMemo(() => {
         const merged = new Map<string, SpectatorPlayer>();
@@ -427,7 +436,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 const next = prev.slice(0, -1);
                 const chars = buildCurrentChars(next, lockedColumns);
                 const word = chars.join('');
-                emit('typing', { letterCount: word.length, currentWord: word });
+                emit('typing', { letterCount: word.length, currentWord: word, currentChars: chars });
                 return next;
             });
         } else if (key.length === 1 && key >= 'a' && key <= 'z') {
@@ -436,7 +445,7 @@ function WordleGame({ solution, date, puzzleNumber, userId, username, avatar, in
                 const next = prev + key;
                 const chars = buildCurrentChars(next, lockedColumns);
                 const word = chars.join('');
-                emit('typing', { letterCount: word.length, currentWord: word });
+                emit('typing', { letterCount: word.length, currentWord: word, currentChars: chars });
                 return next;
             });
         }

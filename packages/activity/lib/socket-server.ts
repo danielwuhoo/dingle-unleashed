@@ -11,6 +11,7 @@ export interface PlayerState {
     gameStatus: 'playing' | 'won' | 'lost';
     letterCount: number;
     currentWord: string;
+    currentChars: string[];
 }
 
 interface RoomState {
@@ -58,6 +59,7 @@ export function setupSocketHandlers(io: Server): void {
                 gameStatus: (data.gameStatus as PlayerState['gameStatus']) || 'playing',
                 letterCount: 0,
                 currentWord: '',
+                currentChars: [],
             };
 
             room.players.set(socket.id, player);
@@ -71,7 +73,7 @@ export function setupSocketHandlers(io: Server): void {
             socket.to(data.date).emit('player_joined', player);
         });
 
-        socket.on('typing', (data: { letterCount: number; currentWord: string }) => {
+        socket.on('typing', (data: { letterCount: number; currentWord: string; currentChars?: string[] }) => {
             if (!currentRoom) return;
             const room = rooms.get(currentRoom);
             const player = room?.players.get(socket.id);
@@ -79,10 +81,12 @@ export function setupSocketHandlers(io: Server): void {
 
             player.letterCount = data.letterCount;
             player.currentWord = data.currentWord;
+            player.currentChars = data.currentChars ?? [];
             socket.to(currentRoom).emit('player_typing', {
                 userId: player.userId,
                 letterCount: data.letterCount,
                 currentWord: data.currentWord,
+                currentChars: player.currentChars,
             });
         });
 
@@ -98,6 +102,7 @@ export function setupSocketHandlers(io: Server): void {
             player.gameStatus = data.gameStatus as PlayerState['gameStatus'];
             player.letterCount = 0;
             player.currentWord = '';
+            player.currentChars = [];
 
             socket.to(currentRoom).emit('player_guess', {
                 userId: player.userId,
