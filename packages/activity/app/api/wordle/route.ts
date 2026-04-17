@@ -1,16 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getTodayEST, getTomorrowEST, isEarlyAccessWindow } from '@/lib/wordle';
 
-function getTodayEST(): string {
-    const now = new Date();
-    const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const year = est.getFullYear();
-    const month = String(est.getMonth() + 1).padStart(2, '0');
-    const day = String(est.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
+export async function GET(request: NextRequest) {
+    const requested = request.nextUrl.searchParams.get('date');
+    const today = getTodayEST();
+    const tomorrow = isEarlyAccessWindow() ? getTomorrowEST() : null;
 
-export async function GET() {
-    const date = getTodayEST();
+    let date: string;
+    if (!requested) {
+        date = today;
+    } else if (requested === today || (tomorrow && requested === tomorrow)) {
+        date = requested;
+    } else {
+        return NextResponse.json({ error: 'Puzzle not accessible' }, { status: 403 });
+    }
 
     const response = await fetch(`https://www.nytimes.com/svc/wordle/v2/${date}.json`, {
         next: { revalidate: 3600 },

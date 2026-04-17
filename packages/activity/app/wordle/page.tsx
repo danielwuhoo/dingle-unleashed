@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ActionIcon, Loader, Modal, Stack, Text } from '@mantine/core';
 import { useDiscordAuth, useWordleSolution, useGameState, useSubmitGuess, useStartGame, useAllPlayers, usePastGame } from '@/lib/hooks';
 import { words } from '@/lib/words';
 import { getEndgameContent } from '@/lib/endgame';
-import { GameStatus } from '@/lib/wordle';
+import { GameStatus, getAccessiblePuzzleDates } from '@/lib/wordle';
 import { getLetterStates, LetterState } from '@/lib/wordle-utils';
 import { useSocket, useMockSocket, SpectatorPlayer } from '@/lib/socket-client';
 import SpectatorPanel from '@/components/SpectatorPanel';
@@ -47,12 +47,14 @@ export default function WordlePage() {
     const viewDate = searchParams.get('date');
 
     const { data: auth, isLoading: authLoading } = useDiscordAuth();
+    const { today, tomorrow } = getAccessiblePuzzleDates();
+    const isLiveDate = !!viewDate && (viewDate === today || viewDate === tomorrow);
 
-    if (viewDate) {
+    if (viewDate && !isLiveDate) {
         return <PastView userId={auth?.user.id} date={viewDate} isLoading={authLoading} />;
     }
 
-    return <LiveView auth={auth} isLoading={authLoading} />;
+    return <LiveView auth={auth} isLoading={authLoading} overrideDate={viewDate ?? undefined} />;
 }
 
 function PastView({ userId, date, isLoading: authLoading }: { userId: string | undefined; date: string; isLoading: boolean }) {
@@ -87,14 +89,31 @@ function PastView({ userId, date, isLoading: authLoading }: { userId: string | u
     );
 }
 
-function LiveView({ auth, isLoading: authLoading }: { auth: any; isLoading: boolean }) {
-    const { data: puzzle, isLoading: puzzleLoading, error } = useWordleSolution();
+function LiveView({ auth, isLoading: authLoading, overrideDate }: { auth: any; isLoading: boolean; overrideDate?: string }) {
+    const router = useRouter();
+    const { today, tomorrow } = getAccessiblePuzzleDates();
+    const { data: puzzle, isLoading: puzzleLoading, error } = useWordleSolution(overrideDate);
     const { data: serverState, isLoading: gameLoading } = useGameState(auth?.user.id, puzzle?.date);
     const startGame = useStartGame();
     const startedRef = useRef(false);
+    const redirectedRef = useRef(false);
+
+    const shouldRedirectToTomorrow =
+        !overrideDate
+        && !!tomorrow
+        && puzzle?.date === today
+        && serverState
+        && serverState.gameStatus !== 'playing';
 
     useEffect(() => {
-        if (auth && puzzle && !startedRef.current) {
+        if (shouldRedirectToTomorrow && !redirectedRef.current) {
+            redirectedRef.current = true;
+            router.replace(`/wordle?date=${tomorrow}`);
+        }
+    }, [shouldRedirectToTomorrow, tomorrow, router]);
+
+    useEffect(() => {
+        if (auth && puzzle && !startedRef.current && !shouldRedirectToTomorrow) {
             startedRef.current = true;
             startGame.mutate({
                 userId: auth.user.id,
@@ -103,9 +122,9 @@ function LiveView({ auth, isLoading: authLoading }: { auth: any; isLoading: bool
                 avatar: auth.user.avatar,
             });
         }
-    }, [auth?.user.id, puzzle?.date]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [auth?.user.id, puzzle?.date, shouldRedirectToTomorrow]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (authLoading || puzzleLoading || gameLoading) {
+    if (authLoading || puzzleLoading || gameLoading || shouldRedirectToTomorrow) {
         return (
             <Stack align="center" justify="center" h="100vh">
                 <Loader />

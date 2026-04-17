@@ -79,11 +79,12 @@ export function useDiscordAuth() {
     });
 }
 
-export function useWordleSolution() {
+export function useWordleSolution(date?: string) {
     return useQuery({
-        queryKey: ['wordle-solution'],
+        queryKey: ['wordle-solution', date ?? 'today'],
         queryFn: async (): Promise<{ solution: string; date: string; puzzleNumber: number }> => {
-            const res = await fetch('/api/wordle');
+            const url = date ? `/api/wordle?date=${date}` : '/api/wordle';
+            const res = await fetch(url);
             return res.json();
         },
         staleTime: Infinity,

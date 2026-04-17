@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeaderboard, getDayResults } from '@/lib/db';
-import { getTodayEST } from '@/lib/wordle';
+import { getTodayEST, getTomorrowEST, isEarlyAccessWindow } from '@/lib/wordle';
 
-type TimeWindow = 'today' | 'yesterday' | '1w' | '1m' | '3m' | 'all';
+type TimeWindow = 'tomorrow' | 'today' | 'yesterday' | '1w' | '1m' | '3m' | 'all';
 
 function getDateCutoff(window: TimeWindow): string | null {
     if (window === 'all') return null;
@@ -42,13 +42,22 @@ function getMinGames(window: TimeWindow): number {
     }
 }
 
-const VALID_WINDOWS = new Set<TimeWindow>(['today', 'yesterday', '1w', '1m', '3m', 'all']);
+const VALID_WINDOWS = new Set<TimeWindow>(['tomorrow', 'today', 'yesterday', '1w', '1m', '3m', 'all']);
 
 export async function GET(request: NextRequest) {
     const window = (request.nextUrl.searchParams.get('window') || 'today') as TimeWindow;
 
     if (!VALID_WINDOWS.has(window)) {
         return NextResponse.json({ error: 'Invalid time window' }, { status: 400 });
+    }
+
+    if (window === 'tomorrow') {
+        if (!isEarlyAccessWindow()) {
+            return NextResponse.json({ error: 'Tomorrow leaderboard not yet available' }, { status: 403 });
+        }
+        const date = getTomorrowEST();
+        const groups = getDayResults(date, false);
+        return NextResponse.json({ type: 'daily', date, groups });
     }
 
     if (window === 'today') {

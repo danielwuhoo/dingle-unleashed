@@ -2,23 +2,30 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Text, Title, Loader, Stack, Button, Modal, Switch } from '@mantine/core';
+import { Text, Title, Loader, Stack, Button, Modal, Switch, Group } from '@mantine/core';
 import { useDiscordAuth, useGameState, useWordleSolution, useStreak } from '@/lib/hooks';
 import { useSettingsContext } from '@/lib/settings-context';
-import { getTodayEST } from '@/lib/wordle';
+import { getAccessiblePuzzleDates } from '@/lib/wordle';
 import { getLandingCopy } from '@/lib/landing';
 import WordleIcon from '@/components/WordleIcon';
 import classes from './page.module.css';
 
 export default function Home() {
     const { data: auth, isLoading: authLoading, error } = useDiscordAuth();
-    const { data: puzzle, isLoading: puzzleLoading } = useWordleSolution();
-    const today = getTodayEST();
-    const { data: gameState, isLoading: gameLoading } = useGameState(auth?.user.id, today);
+    const { today, tomorrow } = getAccessiblePuzzleDates();
+
+    const { data: todayPuzzle, isLoading: todayPuzzleLoading } = useWordleSolution();
+    const { data: tomorrowPuzzle, isLoading: tomorrowPuzzleLoading } = useWordleSolution(tomorrow ?? undefined);
+    const { data: todayState, isLoading: todayStateLoading } = useGameState(auth?.user.id, today);
+    const { data: tomorrowState, isLoading: tomorrowStateLoading } = useGameState(auth?.user.id, tomorrow ?? undefined);
+
     const { data: streakData } = useStreak(auth?.user.id);
     const streak = streakData?.streak ?? 0;
     const { colorblind, lightMode, setColorblind, setLightMode } = useSettingsContext();
     const [settingsOpen, setSettingsOpen] = useState(false);
+
+    const puzzleLoading = todayPuzzleLoading || (!!tomorrow && tomorrowPuzzleLoading);
+    const gameLoading = todayStateLoading || (!!tomorrow && tomorrowStateLoading);
 
     if (authLoading || puzzleLoading || gameLoading) {
         return (
@@ -38,7 +45,10 @@ export default function Home() {
     }
 
     const name = auth?.user.global_name ?? auth?.user.username ?? 'friend';
-    const { subtitle, buttonText } = getLandingCopy(gameState);
+    const showBothCards = !!tomorrow;
+
+    const todayCopy = getLandingCopy(todayState);
+    const tomorrowCopy = getLandingCopy(tomorrowState);
 
     return (
         <div className={classes.container}>
@@ -67,26 +77,63 @@ export default function Home() {
             <Stack align="center" gap="lg" className={classes.content}>
                 <Title order={1} className={classes.title}>Dingle</Title>
                 <WordleIcon />
-                {puzzle && <Text size="sm" c="dimmed" fw={600}>#{puzzle.puzzleNumber}</Text>}
                 {streak > 0 && (
                     <Text size="sm" fw={700} c="#f5a97f">
                         🔥 {streak} day streak
                     </Text>
                 )}
-                <Stack align="center" gap={4}>
-                    <Text size="xl" fw={700}>hey {name}</Text>
-                    <Text size="md" c="dimmed">{subtitle}</Text>
-                </Stack>
-                <Button
-                    className={classes.button}
-                    component={Link}
-                    href="/wordle"
-                    size="lg"
-                    radius="md"
-                    color="mauve"
-                >
-                    {buttonText}
-                </Button>
+                <Text size="xl" fw={700}>hey {name}</Text>
+
+                {showBothCards ? (
+                    <Group gap="md" justify="center" align="stretch" wrap="nowrap">
+                        <Stack align="center" gap={6} className={classes.card}>
+                            <Text size="sm" fw={700}>today</Text>
+                            {todayPuzzle && <Text size="xs" c="dimmed" fw={600}>#{todayPuzzle.puzzleNumber}</Text>}
+                            <Text size="xs" c="dimmed" ta="center">{todayCopy.subtitle}</Text>
+                            <Button
+                                className={classes.button}
+                                component={Link}
+                                href={`/wordle?date=${today}`}
+                                size="md"
+                                radius="md"
+                                color="mauve"
+                            >
+                                {todayCopy.buttonText}
+                            </Button>
+                        </Stack>
+                        <Stack align="center" gap={6} className={classes.card}>
+                            <Text size="sm" fw={700}>tomorrow</Text>
+                            {tomorrowPuzzle && <Text size="xs" c="dimmed" fw={600}>#{tomorrowPuzzle.puzzleNumber}</Text>}
+                            <Text size="xs" c="dimmed" ta="center">{tomorrowCopy.subtitle}</Text>
+                            <Button
+                                className={classes.button}
+                                component={Link}
+                                href={`/wordle?date=${tomorrow}`}
+                                size="md"
+                                radius="md"
+                                color="mauve"
+                            >
+                                {tomorrowCopy.buttonText}
+                            </Button>
+                        </Stack>
+                    </Group>
+                ) : (
+                    <>
+                        {todayPuzzle && <Text size="sm" c="dimmed" fw={600}>#{todayPuzzle.puzzleNumber}</Text>}
+                        <Text size="md" c="dimmed">{todayCopy.subtitle}</Text>
+                        <Button
+                            className={classes.button}
+                            component={Link}
+                            href="/wordle"
+                            size="lg"
+                            radius="md"
+                            color="mauve"
+                        >
+                            {todayCopy.buttonText}
+                        </Button>
+                    </>
+                )}
+
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <Text component={Link} href="/history" size="sm" c="dimmed" td="underline">
                         history

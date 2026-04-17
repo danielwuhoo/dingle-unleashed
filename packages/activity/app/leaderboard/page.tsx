@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader, Stack, Text, ActionIcon } from '@mantine/core';
 
 import { useDiscordAuth, useLeaderboard, LeaderboardResponse, LeaderboardEntry, DayGroup } from '@/lib/hooks';
+import { isEarlyAccessWindow } from '@/lib/wordle';
 import classes from './leaderboard.module.css';
 
-const TIME_WINDOWS = [
+const BASE_TIME_WINDOWS = [
     { key: 'today', label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
     { key: '1w', label: '1W' },
@@ -15,6 +16,8 @@ const TIME_WINDOWS = [
     { key: '3m', label: '3M' },
     { key: 'all', label: 'All' },
 ] as const;
+
+const TOMORROW_WINDOW = { key: 'tomorrow', label: 'Tomorrow' } as const;
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -130,6 +133,10 @@ function RankedView({ entries, currentUserId }: { entries: LeaderboardEntry[]; c
 export default function LeaderboardPage() {
     const { data: auth, isLoading: authLoading } = useDiscordAuth();
     const [timeWindow, setTimeWindow] = useState('today');
+    const timeWindows = useMemo(
+        () => (isEarlyAccessWindow() ? [TOMORROW_WINDOW, ...BASE_TIME_WINDOWS] : BASE_TIME_WINDOWS),
+        [],
+    );
     const { data, isLoading: leaderboardLoading } = useLeaderboard(timeWindow);
 
     if (authLoading || leaderboardLoading) {
@@ -157,7 +164,7 @@ export default function LeaderboardPage() {
             </div>
 
             <div className={classes.windowSelector}>
-                {TIME_WINDOWS.map(({ key, label }) => (
+                {timeWindows.map(({ key, label }) => (
                     <button
                         key={key}
                         className={`${classes.windowButton} ${timeWindow === key ? classes.windowButtonActive : ''}`}
