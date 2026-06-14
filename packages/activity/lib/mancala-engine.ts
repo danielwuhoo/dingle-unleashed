@@ -128,3 +128,21 @@ export function applyMove(state: MancalaState, pit: number): MancalaState {
 export function scoreFor(state: MancalaState, seat: Seat): number {
     return state.pits[STORE[seat]];
 }
+
+// The ordered list of pit indices that each receive one stone when `seat` sows
+// from `pit`, given a board `pits`. Used by the UI to animate the sow. Does not
+// account for captures — the caller settles to the final state afterwards.
+export function sowPath(pits: number[], seat: Seat, pit: number): number[] {
+    const opponentStore = STORE[seat === 0 ? 1 : 0];
+    let stones = pits[pit];
+    let index = pit;
+    const path: number[] = [];
+    while (stones > 0) {
+        do {
+            index = (index + 1) % 14;
+        } while (index === opponentStore);
+        path.push(index);
+        stones -= 1;
+    }
+    return path;
+}

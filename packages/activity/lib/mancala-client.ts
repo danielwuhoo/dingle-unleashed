@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { MancalaState, Seat, applyMove, initialState, legalMoves } from './mancala-engine';
+import { MancalaState, Seat, applyMove, initialState, legalMoves, sowPath } from './mancala-engine';
+
+// Milliseconds between each stone landing during the sow animation. Shared so
+// the practice bot can wait for the current animation to finish before moving.
+export const SOW_STEP_MS = 150;
 
 export interface LobbyPlayer {
     userId: string;
@@ -38,6 +42,11 @@ export interface MatchResult {
     forfeitedBy: string | null;
 }
 
+export interface LastMove {
+    seat: Seat;
+    pit: number;
+}
+
 export interface MancalaLobby {
     connected: boolean;
     players: LobbyPlayer[];
@@ -45,6 +54,7 @@ export interface MancalaLobby {
     outgoing: OutgoingChallenge | null;
     match: MatchInfo | null;
     result: MatchResult | null;
+    lastMove: LastMove | null;
     sendChallenge: (targetUserId: string) => void;
     respondToChallenge: (accept: boolean) => void;
     sendMove: (pit: number) => void;
@@ -67,6 +77,7 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
     const [outgoing, setOutgoing] = useState<OutgoingChallenge | null>(null);
     const [match, setMatch] = useState<MatchInfo | null>(null);
     const [result, setResult] = useState<MatchResult | null>(null);
+    const [lastMove, setLastMove] = useState<LastMove | null>(null);
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
@@ -101,12 +112,14 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         socket.on('mancala_match_started', (data: MatchInfo) => {
             setMatch(data);
             setResult(null);
+            setLastMove(null);
             setIncoming(null);
             setOutgoing(null);
         });
 
-        socket.on('mancala_match_state', (data: { matchId: string; state: MancalaState }) => {
+        socket.on('mancala_match_state', (data: { matchId: string; state: MancalaState; lastMove?: LastMove }) => {
             setMatch((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
+            if (data.lastMove) setLastMove(data.lastMove);
         });
 
         socket.on(
@@ -155,12 +168,14 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         setOutgoing({ targetUserId: match.opponent.userId, status: 'pending' });
         setMatch(null);
         setResult(null);
+        setLastMove(null);
     }, [match]);
 
     const leaveMatch = useCallback(() => {
         if (match) socketRef.current?.emit('mancala_leave_match', { matchId: match.matchId });
         setMatch(null);
         setResult(null);
+        setLastMove(null);
     }, [match]);
 
     const dismissOutgoing = useCallback(() => setOutgoing(null), []);
@@ -172,6 +187,7 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         outgoing,
         match,
         result,
+        lastMove,
         sendChallenge,
         respondToChallenge,
         sendMove,
@@ -188,35 +204,54 @@ const BOT: Opponent = { userId: 'mancala-bot', username: 'Mancala Bot', avatar: 
 export function useMockMancala(self: { userId: string } | null): MancalaLobby {
     const [match, setMatch] = useState<MatchInfo | null>(null);
     const [result, setResult] = useState<MatchResult | null>(null);
+    const [lastMove, setLastMove] = useState<LastMove | null>(null);
+    const stateRef = useRef<MancalaState | null>(null);
     const botTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const playRef = useRef<(seat: Seat, pit: number) => void>(() => {});
 
     const players: LobbyPlayer[] = [{ ...BOT, status: 'idle' }];
 
-    const finishIfOver = useCallback((state: MancalaState) => {
-        if (state.status === 'over') setResult({ reason: 'finished', forfeitedBy: null });
+    // The bot plays its first legal move once the preceding sow animation has
+    // finished (delay passed in by the caller) plus a short beat.
+    const scheduleBot = useCallback((delay: number) => {
+        if (botTimer.current) clearTimeout(botTimer.current);
+        botTimer.current = setTimeout(() => {
+            const cur = stateRef.current;
+            if (cur && cur.status === 'playing' && cur.turn === 1) {
+                const moves = legalMoves(cur, 1);
+                if (moves.length > 0) playRef.current(1, moves[0]);
+            }
+        }, delay);
     }, []);
 
-    // Bot plays after the human, whenever it's the bot's turn (seat 1).
-    const scheduleBot = useCallback(
-        (state: MancalaState) => {
-            if (botTimer.current) clearTimeout(botTimer.current);
-            if (state.status !== 'playing' || state.turn !== 1) return;
-            botTimer.current = setTimeout(() => {
-                setMatch((prev) => {
-                    if (!prev || prev.state.status !== 'playing' || prev.state.turn !== 1) return prev;
-                    const moves = legalMoves(prev.state, 1);
-                    if (moves.length === 0) return prev;
-                    // Deterministic-ish pick (no Math.random dependency needed): first legal.
-                    const next = applyMove(prev.state, moves[0]);
-                    finishIfOver(next);
-                    const updated = { ...prev, state: next };
-                    scheduleBot(next);
-                    return updated;
-                });
-            }, 600);
+    // Apply a move against the ref-held authoritative state. Side effects live
+    // here (not inside a setState updater) so React strict mode can't double-run them.
+    const play = useCallback(
+        (moveSeat: Seat, pit: number) => {
+            const cur = stateRef.current;
+            if (!cur || cur.status !== 'playing' || cur.turn !== moveSeat) return;
+            if (!legalMoves(cur, moveSeat).includes(pit)) return;
+
+            // How long this move's sow animation will run, so the bot can wait it out.
+            const animMs = (sowPath(cur.pits, moveSeat, pit).length + 1) * SOW_STEP_MS;
+
+            const next = applyMove(cur, pit);
+            stateRef.current = next;
+            setMatch((prev) => (prev ? { ...prev, state: next } : prev));
+            setLastMove({ seat: moveSeat, pit });
+
+            if (next.status === 'over') {
+                setResult({ reason: 'finished', forfeitedBy: null });
+            } else if (next.turn === 1) {
+                scheduleBot(animMs + 400);
+            }
         },
-        [finishIfOver],
+        [scheduleBot],
     );
+
+    useEffect(() => {
+        playRef.current = play;
+    }, [play]);
 
     useEffect(() => () => {
         if (botTimer.current) clearTimeout(botTimer.current);
@@ -224,8 +259,10 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
 
     const startMatch = useCallback(() => {
         const state = initialState(0);
+        stateRef.current = state;
         setMatch({ matchId: 'mock', seat: 0, opponent: BOT, state });
         setResult(null);
+        setLastMove(null);
     }, []);
 
     const sendChallenge = useCallback(() => startMatch(), [startMatch]);
@@ -235,23 +272,13 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
 
     const leaveMatch = useCallback(() => {
         if (botTimer.current) clearTimeout(botTimer.current);
+        stateRef.current = null;
         setMatch(null);
         setResult(null);
+        setLastMove(null);
     }, []);
 
-    const sendMove = useCallback(
-        (pit: number) => {
-            setMatch((prev) => {
-                if (!prev || prev.state.turn !== 0 || prev.state.status !== 'playing') return prev;
-                if (!legalMoves(prev.state, 0).includes(pit)) return prev;
-                const next = applyMove(prev.state, pit);
-                finishIfOver(next);
-                scheduleBot(next);
-                return { ...prev, state: next };
-            });
-        },
-        [finishIfOver, scheduleBot],
-    );
+    const sendMove = useCallback((pit: number) => play(0, pit), [play]);
 
     void self;
 
@@ -262,6 +289,7 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
         outgoing: null,
         match,
         result,
+        lastMove,
         sendChallenge,
         respondToChallenge,
         sendMove,

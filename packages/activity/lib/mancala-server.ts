@@ -99,8 +99,10 @@ export function setupMancalaHandlers(io: Server): void {
 
         socket.on(
             'mancala_join',
-            (data: { instanceId: string; userId: string; username: string; avatar?: string | null }) => {
-                lobbyId = data.instanceId || 'default';
+            (data: { instanceId?: string; userId: string; username: string; avatar?: string | null }) => {
+                // Single global lobby — everyone using the activity can challenge
+                // each other regardless of which voice channel they launched from.
+                lobbyId = 'global';
                 userId = data.userId;
                 const lobby = getOrCreateLobby(lobbyId);
 
