@@ -135,6 +135,9 @@ export default function Home() {
                 )}
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
+                    <Text component={Link} href="/mancala" size="sm" c="dimmed" td="underline">
+                        mancala
+                    </Text>
                     <Text component={Link} href="/history" size="sm" c="dimmed" td="underline">
                         history
                     </Text>

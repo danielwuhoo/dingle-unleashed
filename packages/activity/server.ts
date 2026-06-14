@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import next from 'next';
 import { Server } from 'socket.io';
 import { setupSocketHandlers } from './lib/socket-server';
+import { setupMancalaHandlers } from './lib/mancala-server';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0';
@@ -22,6 +23,7 @@ app.prepare().then(() => {
     });
 
     setupSocketHandlers(io);
+    setupMancalaHandlers(io);
 
     server.listen(port, () => {
         console.log(`> Ready on http://${hostname}:${port}`);

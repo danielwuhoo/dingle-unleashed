@@ -70,6 +70,14 @@ async function authenticateWithDiscord(): Promise<DiscordAuth> {
     return { user, accessToken: access_token };
 }
 
+// The Discord activity instance id (shared by everyone in the same voice
+// channel session). Used to scope the Mancala lobby. Falls back to a fixed id
+// for browser/dev where there is no real instance.
+export function getDiscordInstanceId(): string {
+    const sdk = getDiscordSdk() as { instanceId?: string | null };
+    return sdk.instanceId || 'dev-lobby';
+}
+
 export function useDiscordAuth() {
     return useQuery({
         queryKey: ['discord-auth'],
