@@ -441,12 +441,14 @@
     grid-template-rows: repeat(6, auto);
 }
 
+/* 90° rotation (not a mirror): my pits (bottom row) become the left column,
+   the opponent's (top row) the right column, keeping the sow loop continuous. */
 .vertical .topRow {
-    grid-column: 1;
+    grid-column: 2;
 }
 
 .vertical .bottomRow {
-    grid-column: 2;
+    grid-column: 1;
 }
 
 .vertical .pit {
