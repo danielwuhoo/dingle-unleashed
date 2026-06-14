@@ -58,6 +58,18 @@
     animation: turn-pulse 1.8s ease-in-out infinite;
 }
 
+.playerChip {
+    padding: 0.25rem 0.6rem 0.25rem 0.3rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.playerChipActive {
+    border-color: var(--mantine-color-mauve-5);
+    box-shadow: 0 0 14px rgba(198, 160, 246, 0.45);
+}
+
 @keyframes turn-pulse {
     0%, 100% { opacity: 0.85; }
     50% { opacity: 1; }

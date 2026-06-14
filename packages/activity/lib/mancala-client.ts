@@ -47,20 +47,36 @@ export interface LastMove {
     pit: number;
 }
 
+export interface MatchSummary {
+    matchId: string;
+    players: [Opponent, Opponent]; // seat 0, seat 1
+}
+
+export interface SpectateInfo {
+    matchId: string;
+    players: [Opponent, Opponent];
+    state: MancalaState;
+    ended?: MatchResult | null;
+}
+
 export interface MancalaLobby {
     connected: boolean;
     players: LobbyPlayer[];
+    liveMatches: MatchSummary[];
     incoming: IncomingChallenge | null;
     outgoing: OutgoingChallenge | null;
     match: MatchInfo | null;
     result: MatchResult | null;
     lastMove: LastMove | null;
+    spectating: SpectateInfo | null;
     sendChallenge: (targetUserId: string) => void;
     respondToChallenge: (accept: boolean) => void;
     sendMove: (pit: number) => void;
     rematch: () => void;
     leaveMatch: () => void;
     dismissOutgoing: () => void;
+    spectate: (matchId: string) => void;
+    stopSpectating: () => void;
 }
 
 interface UseMancalaOptions {
@@ -73,11 +89,13 @@ interface UseMancalaOptions {
 export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby {
     const [connected, setConnected] = useState(false);
     const [players, setPlayers] = useState<LobbyPlayer[]>([]);
+    const [liveMatches, setLiveMatches] = useState<MatchSummary[]>([]);
     const [incoming, setIncoming] = useState<IncomingChallenge | null>(null);
     const [outgoing, setOutgoing] = useState<OutgoingChallenge | null>(null);
     const [match, setMatch] = useState<MatchInfo | null>(null);
     const [result, setResult] = useState<MatchResult | null>(null);
     const [lastMove, setLastMove] = useState<LastMove | null>(null);
+    const [spectating, setSpectating] = useState<SpectateInfo | null>(null);
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
@@ -97,8 +115,11 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         });
         socket.on('disconnect', () => setConnected(false));
 
-        socket.on('mancala_lobby_state', (data: { players: LobbyPlayer[] }) => {
+        socket.on('mancala_lobby_state', (data: { players: LobbyPlayer[]; matches?: MatchSummary[] }) => {
             setPlayers(data.players.filter((p) => p.userId !== options.userId));
+            setLiveMatches(
+                (data.matches ?? []).filter((m) => m.players.every((pl) => pl.userId !== options.userId)),
+            );
         });
 
         socket.on('mancala_challenge_received', (data: IncomingChallenge) => {
@@ -113,12 +134,19 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
             setMatch(data);
             setResult(null);
             setLastMove(null);
+            setSpectating(null);
             setIncoming(null);
             setOutgoing(null);
         });
 
+        socket.on('mancala_spectate_state', (data: SpectateInfo) => {
+            setSpectating({ ...data, ended: null });
+            setLastMove(null);
+        });
+
         socket.on('mancala_match_state', (data: { matchId: string; state: MancalaState; lastMove?: LastMove }) => {
             setMatch((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
+            setSpectating((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
             if (data.lastMove) setLastMove(data.lastMove);
         });
 
@@ -127,6 +155,11 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
             (data: { matchId: string; reason: 'finished' | 'forfeit'; forfeitedBy: string | null; state: MancalaState }) => {
                 setMatch((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
                 setResult({ reason: data.reason, forfeitedBy: data.forfeitedBy });
+                setSpectating((prev) =>
+                    prev && prev.matchId === data.matchId
+                        ? { ...prev, state: data.state, ended: { reason: data.reason, forfeitedBy: data.forfeitedBy } }
+                        : prev,
+                );
             },
         );
 
@@ -180,20 +213,37 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
 
     const dismissOutgoing = useCallback(() => setOutgoing(null), []);
 
+    const spectate = useCallback((matchId: string) => {
+        socketRef.current?.emit('mancala_spectate', { matchId });
+        setLastMove(null);
+    }, []);
+
+    const stopSpectating = useCallback(() => {
+        setSpectating((prev) => {
+            if (prev) socketRef.current?.emit('mancala_stop_spectate', { matchId: prev.matchId });
+            return null;
+        });
+        setLastMove(null);
+    }, []);
+
     return {
         connected,
         players,
+        liveMatches,
         incoming,
         outgoing,
         match,
         result,
         lastMove,
+        spectating,
         sendChallenge,
         respondToChallenge,
         sendMove,
         rematch,
         leaveMatch,
         dismissOutgoing,
+        spectate,
+        stopSpectating,
     };
 }
 
@@ -285,16 +335,20 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
     return {
         connected: true,
         players,
+        liveMatches: [],
         incoming: null,
         outgoing: null,
         match,
         result,
         lastMove,
+        spectating: null,
         sendChallenge,
         respondToChallenge,
         sendMove,
         rematch,
         leaveMatch,
         dismissOutgoing,
+        spectate: () => {},
+        stopSpectating: () => {},
     };
 }

@@ -67,9 +67,16 @@ function publicPlayer(u: LobbyUser) {
     };
 }
 
+function matchSummary(match: Match) {
+    return { matchId: match.id, players: match.seats };
+}
+
 function broadcastLobby(io: Server, lobby: Lobby): void {
     const players = Array.from(lobby.users.values()).map(publicPlayer);
-    io.to(lobbyRoom(lobby.id)).emit('mancala_lobby_state', { players });
+    const matches = Array.from(lobby.matches.values())
+        .filter((m) => !m.over)
+        .map(matchSummary);
+    io.to(lobbyRoom(lobby.id)).emit('mancala_lobby_state', { players, matches });
 }
 
 function socketForUser(io: Server, socketId: string): Socket | undefined {
@@ -233,6 +240,23 @@ export function setupMancalaHandlers(io: Server): void {
             if (match.state.status === 'over') {
                 endMatch(io, lobby, match, 'finished');
             }
+        });
+
+        socket.on('mancala_spectate', (data: { matchId: string }) => {
+            if (!lobbyId) return;
+            const lobby = lobbies.get(lobbyId);
+            const match = lobby?.matches.get(data.matchId);
+            if (!lobby || !match || match.over) return;
+            socket.join(matchRoom(match.id));
+            socket.emit('mancala_spectate_state', {
+                matchId: match.id,
+                players: match.seats,
+                state: match.state,
+            });
+        });
+
+        socket.on('mancala_stop_spectate', (data: { matchId: string }) => {
+            socket.leave(matchRoom(data.matchId));
         });
 
         socket.on('mancala_rematch', (data: { matchId: string }) => {

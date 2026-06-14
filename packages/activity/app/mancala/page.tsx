@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Avatar, Button, Group, Loader, Modal, Paper, Stack, Text, Title } from '@mantine/core';
 import { useDiscordAuth } from '@/lib/hooks';
-import { useMancalaLobby, useMockMancala, MancalaLobby, LobbyPlayer, LastMove, SOW_STEP_MS } from '@/lib/mancala-client';
+import { useMancalaLobby, useMockMancala, MancalaLobby, LobbyPlayer, LastMove, MatchSummary, SOW_STEP_MS } from '@/lib/mancala-client';
 import { MancalaState, STORE, Seat, legalMoves, pitsForSeat, sowPath } from '@/lib/mancala-engine';
 import { playTick, playCapture, playWin, playLose, useMute } from '@/lib/mancala-sound';
 import classes from './mancala.module.css';
@@ -62,6 +62,8 @@ export default function MancalaPage() {
         <div className={classes.page}>
             {active.match ? (
                 <MatchView lobby={active} myUserId={auth.user.id} onLeave={exitMatch} />
+            ) : lobby.spectating ? (
+                <SpectateView lobby={lobby} />
             ) : (
                 <LobbyView
                     lobby={lobby}
@@ -76,7 +78,7 @@ export default function MancalaPage() {
 }
 
 function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () => void }) {
-    const { players, incoming, outgoing, sendChallenge, respondToChallenge, dismissOutgoing } = lobby;
+    const { players, liveMatches, incoming, outgoing, sendChallenge, respondToChallenge, dismissOutgoing, spectate } = lobby;
 
     return (
         <Stack align="center" gap="lg" className={classes.lobby}>
@@ -88,7 +90,7 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
             </Group>
 
             <Title order={2} className={classes.lobbyTitle}>Mancala</Title>
-            <Text size="sm" c="dimmed">Challenge someone to a game.</Text>
+            <Text size="sm" c="dimmed">Challenge someone, or watch a live game.</Text>
 
             <Stack gap="xs" w="100%" maw={420}>
                 {players.length === 0 ? (
@@ -99,6 +101,15 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                     players.map((p) => <PlayerRow key={p.userId} player={p} onChallenge={() => sendChallenge(p.userId)} />)
                 )}
             </Stack>
+
+            {liveMatches.length > 0 && (
+                <Stack gap="xs" w="100%" maw={420}>
+                    <Text size="xs" fw={700} c="dimmed" tt="uppercase">👀 Live games</Text>
+                    {liveMatches.map((m) => (
+                        <LiveMatchRow key={m.matchId} match={m} onWatch={() => spectate(m.matchId)} />
+                    ))}
+                </Stack>
+            )}
 
             <Button variant="light" color="mauve" radius="xl" onClick={onPractice}>
                 🤖 Practice vs Bot
@@ -161,6 +172,84 @@ function PlayerRow({ player, onChallenge }: { player: LobbyPlayer; onChallenge: 
                 </Button>
             </Group>
         </Paper>
+    );
+}
+
+function LiveMatchRow({ match, onWatch }: { match: MatchSummary; onWatch: () => void }) {
+    const [a, b] = match.players;
+    return (
+        <Paper withBorder p="sm" radius="md" className={classes.playerRow}>
+            <Group justify="space-between">
+                <Group gap={6}>
+                    <Avatar src={avatarUrl(a.userId, a.avatar)} radius="xl" size="sm" />
+                    <Text size="sm" fw={600}>{a.username}</Text>
+                    <Text size="xs" c="dimmed">vs</Text>
+                    <Avatar src={avatarUrl(b.userId, b.avatar)} radius="xl" size="sm" />
+                    <Text size="sm" fw={600}>{b.username}</Text>
+                </Group>
+                <Button size="xs" variant="light" color="teal" radius="xl" onClick={onWatch}>
+                    watch
+                </Button>
+            </Group>
+        </Paper>
+    );
+}
+
+function SpectateView({ lobby }: { lobby: MancalaLobby }) {
+    const { spectating, stopSpectating } = lobby;
+    if (!spectating) return null;
+
+    const { players, state, ended } = spectating;
+    const [p0, p1] = players;
+    const isOver = state.status === 'over' || !!ended;
+
+    let status: string;
+    if (ended?.reason === 'forfeit') {
+        const winner = ended.forfeitedBy === p0.userId ? p1 : p0;
+        status = `${winner.username} wins (opponent left)`;
+    } else if (isOver) {
+        if (state.winner === 'draw') status = "It's a draw! 🤝";
+        else status = `${state.winner === 0 ? p0.username : p1.username} wins! 🎉`;
+    } else {
+        status = `${state.turn === 0 ? p0.username : p1.username}'s turn`;
+    }
+
+    return (
+        <Stack align="center" gap="md" className={classes.matchView}>
+            <Group justify="space-between" w="100%" maw={560}>
+                <Text component="span" size="sm" c="dimmed" className={classes.leaveLink} onClick={stopSpectating}>
+                    ← stop watching
+                </Text>
+                <Text size="sm" c="teal">👀 spectating</Text>
+            </Group>
+
+            <Group gap="xs" justify="center">
+                <PlayerChip player={p1} active={!isOver && state.turn === 1} />
+                <Text size="sm" c="dimmed">vs</Text>
+                <PlayerChip player={p0} active={!isOver && state.turn === 0} />
+            </Group>
+
+            {isOver ? (
+                <div className={`${classes.banner} ${classes.banner_draw}`}>{status}</div>
+            ) : (
+                <Text fw={700} className={classes.turnText} c="dimmed">{status}</Text>
+            )}
+
+            <Board key={spectating.matchId} state={state} lastMove={lobby.lastMove} seat={0} interactive={false} onPit={() => {}} />
+
+            {isOver && (
+                <Button variant="default" radius="xl" onClick={stopSpectating}>Back to lobby</Button>
+            )}
+        </Stack>
+    );
+}
+
+function PlayerChip({ player, active }: { player: { userId: string; username: string; avatar?: string | null }; active: boolean }) {
+    return (
+        <Group gap={6} className={`${classes.playerChip} ${active ? classes.playerChipActive : ''}`}>
+            <Avatar src={avatarUrl(player.userId, player.avatar)} radius="xl" size="sm" />
+            <Text size="sm" fw={600}>{player.username}</Text>
+        </Group>
     );
 }
 
@@ -242,11 +331,13 @@ function Board({
     lastMove,
     seat,
     onPit,
+    interactive = true,
 }: {
     state: MancalaState;
     lastMove: LastMove | null;
     seat: Seat;
     onPit: (pit: number) => void;
+    interactive?: boolean;
 }) {
     // `display` is the visually-shown board, which lags the authoritative state
     // during the sow animation, then settles to state.pits when it ends.
@@ -363,11 +454,16 @@ function Board({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lastMove, state]);
 
-    // Win/lose chime, once, when the game ends.
+    // Win/lose chime, once, when the game ends. Spectators get a neutral fanfare.
     useEffect(() => {
         if (state.status === 'over') {
-            if (state.winner === seat) playWin();
-            else if (state.winner !== 'draw') playLose();
+            if (!interactive) {
+                if (state.winner !== 'draw') playWin();
+            } else if (state.winner === seat) {
+                playWin();
+            } else if (state.winner !== 'draw') {
+                playLose();
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.status]);
@@ -375,7 +471,7 @@ function Board({
     const oppSeat: Seat = seat === 0 ? 1 : 0;
     const myPits = pitsForSeat(seat); // bottom row, sowing order left→right
     const oppPits = [...pitsForSeat(oppSeat)].reverse(); // top row, mirrored
-    const canMove = state.status === 'playing' && state.turn === seat && !animating;
+    const canMove = interactive && state.status === 'playing' && state.turn === seat && !animating;
     const legal = canMove ? legalMoves(state, seat) : [];
 
     const setPitEl = (idx: number) => (el: HTMLElement | null) => {
