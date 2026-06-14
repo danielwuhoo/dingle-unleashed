@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { MancalaState, Seat, applyMove, initialState, legalMoves, sowPath } from './mancala-engine';
+import { MancalaState, RuleConfig, DEFAULT_RULES, Seat, applyMove, initialState, legalMoves, sowSequence } from './mancala-engine';
 
 // Milliseconds between each stone landing during the sow animation. Shared so
 // the practice bot can wait for the current animation to finish before moving.
@@ -26,10 +26,14 @@ export interface MatchInfo {
     seat: Seat;
     opponent: Opponent;
     state: MancalaState;
+    config: RuleConfig;
+    moved: [boolean, boolean];
+    pieUsed: boolean;
 }
 
 export interface IncomingChallenge {
     challenger: Opponent;
+    config: RuleConfig;
 }
 
 export interface OutgoingChallenge {
@@ -50,12 +54,14 @@ export interface LastMove {
 export interface MatchSummary {
     matchId: string;
     players: [Opponent, Opponent]; // seat 0, seat 1
+    config: RuleConfig;
 }
 
 export interface SpectateInfo {
     matchId: string;
     players: [Opponent, Opponent];
     state: MancalaState;
+    config: RuleConfig;
     ended?: MatchResult | null;
 }
 
@@ -69,14 +75,23 @@ export interface MancalaLobby {
     result: MatchResult | null;
     lastMove: LastMove | null;
     spectating: SpectateInfo | null;
-    sendChallenge: (targetUserId: string) => void;
+    sendChallenge: (targetUserId: string, config?: RuleConfig) => void;
     respondToChallenge: (accept: boolean) => void;
     sendMove: (pit: number) => void;
+    swap: () => void;
     rematch: () => void;
     leaveMatch: () => void;
     dismissOutgoing: () => void;
     spectate: (matchId: string) => void;
     stopSpectating: () => void;
+}
+
+// Whether the player on `seat` may invoke the pie-rule swap right now.
+export function canSwap(match: MatchInfo | null): boolean {
+    if (!match) return false;
+    const { config, moved, pieUsed, seat, state } = match;
+    const other = seat === 0 ? 1 : 0;
+    return config.pieRule && !pieUsed && state.status === 'playing' && state.turn === seat && !moved[seat] && moved[other];
 }
 
 interface UseMancalaOptions {
@@ -97,6 +112,7 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
     const [lastMove, setLastMove] = useState<LastMove | null>(null);
     const [spectating, setSpectating] = useState<SpectateInfo | null>(null);
     const socketRef = useRef<Socket | null>(null);
+    const matchIdRef = useRef<string | null>(null); // my active match, for the spectate guard
 
     useEffect(() => {
         if (!options) return undefined;
@@ -131,6 +147,7 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         });
 
         socket.on('mancala_match_started', (data: MatchInfo) => {
+            matchIdRef.current = data.matchId;
             setMatch(data);
             setResult(null);
             setLastMove(null);
@@ -140,15 +157,24 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         });
 
         socket.on('mancala_spectate_state', (data: SpectateInfo) => {
+            // Players in this match also receive this (after a pie swap) — they ignore it.
+            if (matchIdRef.current === data.matchId) return;
             setSpectating({ ...data, ended: null });
             setLastMove(null);
         });
 
-        socket.on('mancala_match_state', (data: { matchId: string; state: MancalaState; lastMove?: LastMove }) => {
-            setMatch((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
-            setSpectating((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
-            if (data.lastMove) setLastMove(data.lastMove);
-        });
+        socket.on(
+            'mancala_match_state',
+            (data: { matchId: string; state: MancalaState; lastMove?: LastMove; moved?: [boolean, boolean]; pieUsed?: boolean }) => {
+                setMatch((prev) =>
+                    prev && prev.matchId === data.matchId
+                        ? { ...prev, state: data.state, moved: data.moved ?? prev.moved, pieUsed: data.pieUsed ?? prev.pieUsed }
+                        : prev,
+                );
+                setSpectating((prev) => (prev && prev.matchId === data.matchId ? { ...prev, state: data.state } : prev));
+                if (data.lastMove) setLastMove(data.lastMove);
+            },
+        );
 
         socket.on(
             'mancala_match_ended',
@@ -170,8 +196,8 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [options?.instanceId, options?.userId]);
 
-    const sendChallenge = useCallback((targetUserId: string) => {
-        socketRef.current?.emit('mancala_challenge', { targetUserId });
+    const sendChallenge = useCallback((targetUserId: string, config: RuleConfig = DEFAULT_RULES) => {
+        socketRef.current?.emit('mancala_challenge', { targetUserId, config });
         setOutgoing({ targetUserId, status: 'pending' });
     }, []);
 
@@ -195,10 +221,16 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         [match],
     );
 
+    const swap = useCallback(() => {
+        if (!match) return;
+        socketRef.current?.emit('mancala_swap', { matchId: match.matchId });
+    }, [match]);
+
     const rematch = useCallback(() => {
         if (!match) return;
-        socketRef.current?.emit('mancala_challenge', { targetUserId: match.opponent.userId });
+        socketRef.current?.emit('mancala_challenge', { targetUserId: match.opponent.userId, config: match.config });
         setOutgoing({ targetUserId: match.opponent.userId, status: 'pending' });
+        matchIdRef.current = null;
         setMatch(null);
         setResult(null);
         setLastMove(null);
@@ -206,6 +238,7 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
 
     const leaveMatch = useCallback(() => {
         if (match) socketRef.current?.emit('mancala_leave_match', { matchId: match.matchId });
+        matchIdRef.current = null;
         setMatch(null);
         setResult(null);
         setLastMove(null);
@@ -239,6 +272,7 @@ export function useMancalaLobby(options: UseMancalaOptions | null): MancalaLobby
         sendChallenge,
         respondToChallenge,
         sendMove,
+        swap,
         rematch,
         leaveMatch,
         dismissOutgoing,
@@ -256,6 +290,7 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
     const [result, setResult] = useState<MatchResult | null>(null);
     const [lastMove, setLastMove] = useState<LastMove | null>(null);
     const stateRef = useRef<MancalaState | null>(null);
+    const configRef = useRef<RuleConfig>(DEFAULT_RULES);
     const botTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const playRef = useRef<(seat: Seat, pit: number) => void>(() => {});
 
@@ -279,13 +314,16 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
     const play = useCallback(
         (moveSeat: Seat, pit: number) => {
             const cur = stateRef.current;
+            const config = configRef.current;
             if (!cur || cur.status !== 'playing' || cur.turn !== moveSeat) return;
             if (!legalMoves(cur, moveSeat).includes(pit)) return;
 
-            // How long this move's sow animation will run, so the bot can wait it out.
-            const animMs = (sowPath(cur.pits, moveSeat, pit).length + 1) * SOW_STEP_MS;
+            // How long this move's (possibly multi-lap) animation runs, so the bot waits it out.
+            const laps = sowSequence(cur.pits, moveSeat, pit, config);
+            const drops = laps.reduce((a, l) => a + l.path.length, 0);
+            const animMs = (drops + laps.length + 1) * SOW_STEP_MS;
 
-            const next = applyMove(cur, pit);
+            const next = applyMove(cur, pit, config);
             stateRef.current = next;
             setMatch((prev) => (prev ? { ...prev, state: next } : prev));
             setLastMove({ seat: moveSeat, pit });
@@ -307,16 +345,17 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
         if (botTimer.current) clearTimeout(botTimer.current);
     }, []);
 
-    const startMatch = useCallback(() => {
-        const state = initialState(0);
+    const startMatch = useCallback((config: RuleConfig) => {
+        configRef.current = config;
+        const state = initialState(0, config);
         stateRef.current = state;
-        setMatch({ matchId: 'mock', seat: 0, opponent: BOT, state });
+        setMatch({ matchId: 'mock', seat: 0, opponent: BOT, state, config, moved: [false, false], pieUsed: true });
         setResult(null);
         setLastMove(null);
     }, []);
 
-    const sendChallenge = useCallback(() => startMatch(), [startMatch]);
-    const rematch = useCallback(() => startMatch(), [startMatch]);
+    const sendChallenge = useCallback((_targetUserId: string, config: RuleConfig = DEFAULT_RULES) => startMatch(config), [startMatch]);
+    const rematch = useCallback(() => startMatch(configRef.current), [startMatch]);
     const respondToChallenge = useCallback(() => {}, []);
     const dismissOutgoing = useCallback(() => {}, []);
 
@@ -345,6 +384,7 @@ export function useMockMancala(self: { userId: string } | null): MancalaLobby {
         sendChallenge,
         respondToChallenge,
         sendMove,
+        swap: () => {},
         rematch,
         leaveMatch,
         dismissOutgoing,

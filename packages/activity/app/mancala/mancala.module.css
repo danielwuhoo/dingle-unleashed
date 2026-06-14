@@ -414,6 +414,64 @@
     100% { transform: translateY(110vh) rotate(var(--rot, 360deg)); opacity: 0.9; }
 }
 
+.ruleChip {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--mantine-color-dark-1);
+    background: var(--mantine-color-dark-6);
+    border: 1px solid var(--mantine-color-dark-5);
+}
+
+/* ---- Vertical orientation (cosmetic) ---- */
+/* Transpose to a tall, narrow board: stores top & bottom, two columns of pits.
+   Rows are auto-sized and pits are capped so the column doesn't balloon. */
+
+.vertical {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    max-width: 240px;
+}
+
+.vertical .topRow,
+.vertical .bottomRow {
+    grid-row: 2;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(6, auto);
+}
+
+.vertical .topRow {
+    grid-column: 1;
+}
+
+.vertical .bottomRow {
+    grid-column: 2;
+}
+
+.vertical .pit {
+    width: 100%;
+    max-width: 58px;
+    max-height: 58px;
+    justify-self: center;
+}
+
+.vertical .storeLeft {
+    grid-column: 1 / 3;
+    grid-row: 1;
+}
+
+.vertical .storeRight {
+    grid-column: 1 / 3;
+    grid-row: 3;
+}
+
+.vertical .store {
+    min-width: 0;
+    min-height: 3rem;
+    border-radius: 1.6rem;
+}
+
 @media (max-width: 480px) {
     .store {
         min-width: 2.6rem;

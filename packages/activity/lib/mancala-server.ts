@@ -1,5 +1,14 @@
 import { Server, Socket } from 'socket.io';
-import { MancalaState, Seat, applyMove, initialState, isLegalMove } from './mancala-engine';
+import { MancalaState, RuleConfig, DEFAULT_RULES, Seat, applyMove, initialState, isLegalMove } from './mancala-engine';
+
+function sanitizeConfig(c: unknown): RuleConfig {
+    const o = (c ?? {}) as Partial<RuleConfig>;
+    return {
+        multiLap: !!o.multiLap,
+        pieRule: !!o.pieRule,
+        randomStart: !!o.randomStart,
+    };
+}
 
 // Real-time 2-player Mancala with an explicit challenge lobby.
 //
@@ -27,15 +36,23 @@ interface Match {
     lobbyId: string;
     seats: [MatchSeat, MatchSeat]; // index === Seat
     state: MancalaState;
+    config: RuleConfig;
+    moved: [boolean, boolean]; // whether each seat has taken a turn (for the pie rule)
+    pieUsed: boolean; // the one-time swap window has closed
     over: boolean;
+}
+
+interface PendingChallenge {
+    target: string;
+    config: RuleConfig;
 }
 
 interface Lobby {
     id: string;
     users: Map<string, LobbyUser>; // keyed by userId
     matches: Map<string, Match>;
-    // pending challenges: challengerUserId -> targetUserId
-    challenges: Map<string, string>;
+    // pending challenges: challengerUserId -> { target, config }
+    challenges: Map<string, PendingChallenge>;
 }
 
 const lobbies = new Map<string, Lobby>();
@@ -68,7 +85,19 @@ function publicPlayer(u: LobbyUser) {
 }
 
 function matchSummary(match: Match) {
-    return { matchId: match.id, players: match.seats };
+    return { matchId: match.id, players: match.seats, config: match.config };
+}
+
+function startedPayload(match: Match, seat: Seat) {
+    return {
+        matchId: match.id,
+        seat,
+        opponent: match.seats[seat === 0 ? 1 : 0],
+        state: match.state,
+        config: match.config,
+        moved: match.moved,
+        pieUsed: match.pieUsed,
+    };
 }
 
 function broadcastLobby(io: Server, lobby: Lobby): void {
@@ -129,12 +158,7 @@ export function setupMancalaHandlers(io: Server): void {
                     if (match) {
                         socket.join(matchRoom(match.id));
                         const seat: Seat = match.seats[0].userId === userId ? 0 : 1;
-                        socket.emit('mancala_match_started', {
-                            matchId: match.id,
-                            seat,
-                            opponent: match.seats[seat === 0 ? 1 : 0],
-                            state: match.state,
-                        });
+                        socket.emit('mancala_match_started', startedPayload(match, seat));
                     }
                 }
 
@@ -142,7 +166,7 @@ export function setupMancalaHandlers(io: Server): void {
             },
         );
 
-        socket.on('mancala_challenge', (data: { targetUserId: string }) => {
+        socket.on('mancala_challenge', (data: { targetUserId: string; config?: RuleConfig }) => {
             if (!lobbyId || !userId) return;
             const lobby = lobbies.get(lobbyId);
             if (!lobby) return;
@@ -152,7 +176,8 @@ export function setupMancalaHandlers(io: Server): void {
             if (challenger.matchId || target.matchId) return; // either side busy
             if (data.targetUserId === userId) return;
 
-            lobby.challenges.set(userId, data.targetUserId);
+            const config = sanitizeConfig(data.config);
+            lobby.challenges.set(userId, { target: data.targetUserId, config });
             const targetSocket = socketForUser(io, target.socketId);
             targetSocket?.emit('mancala_challenge_received', {
                 challenger: {
@@ -160,6 +185,7 @@ export function setupMancalaHandlers(io: Server): void {
                     username: challenger.username,
                     avatar: challenger.avatar ?? null,
                 },
+                config,
             });
         });
 
@@ -169,7 +195,7 @@ export function setupMancalaHandlers(io: Server): void {
             if (!lobby) return;
 
             const pending = lobby.challenges.get(data.challengerUserId);
-            if (pending !== userId) return; // no such challenge aimed at me
+            if (!pending || pending.target !== userId) return; // no such challenge aimed at me
             lobby.challenges.delete(data.challengerUserId);
 
             const challenger = lobby.users.get(data.challengerUserId);
@@ -187,6 +213,7 @@ export function setupMancalaHandlers(io: Server): void {
             // Create the match. Challenger takes seat 0 (moves first).
             matchCounter += 1;
             const matchId = `m${matchCounter}`;
+            const config = pending.config;
             const match: Match = {
                 id: matchId,
                 lobbyId: lobby.id,
@@ -194,7 +221,10 @@ export function setupMancalaHandlers(io: Server): void {
                     { userId: challenger.userId, username: challenger.username, avatar: challenger.avatar ?? null },
                     { userId: target.userId, username: target.username, avatar: target.avatar ?? null },
                 ],
-                state: initialState(0),
+                state: initialState(0, config),
+                config,
+                moved: [false, false],
+                pieUsed: false,
                 over: false,
             };
             lobby.matches.set(matchId, match);
@@ -206,12 +236,7 @@ export function setupMancalaHandlers(io: Server): void {
                 const s = u && socketForUser(io, u.socketId);
                 if (s) {
                     s.join(matchRoom(matchId));
-                    s.emit('mancala_match_started', {
-                        matchId,
-                        seat,
-                        opponent: match.seats[seat === 0 ? 1 : 0],
-                        state: match.state,
-                    });
+                    s.emit('mancala_match_started', startedPayload(match, seat));
                 }
             }
             broadcastLobby(io, lobby);
@@ -230,16 +255,58 @@ export function setupMancalaHandlers(io: Server): void {
             if (match.state.turn !== seat) return; // not your turn
             if (!isLegalMove(match.state, seat, data.pit)) return;
 
-            match.state = applyMove(match.state, data.pit);
+            // The pie window closes once the second player makes their first move.
+            const other: Seat = seat === 0 ? 1 : 0;
+            if (!match.moved[seat] && match.moved[other]) match.pieUsed = true;
+            match.moved[seat] = true;
+
+            match.state = applyMove(match.state, data.pit, match.config);
             io.to(matchRoom(match.id)).emit('mancala_match_state', {
                 matchId: match.id,
                 state: match.state,
                 lastMove: { seat, pit: data.pit },
+                moved: match.moved,
+                pieUsed: match.pieUsed,
             });
 
             if (match.state.status === 'over') {
                 endMatch(io, lobby, match, 'finished');
             }
+        });
+
+        socket.on('mancala_swap', (data: { matchId: string }) => {
+            if (!lobbyId || !userId) return;
+            const lobby = lobbies.get(lobbyId);
+            const match = lobby?.matches.get(data.matchId);
+            if (!lobby || !match || match.over) return;
+            if (!match.config.pieRule || match.pieUsed) return;
+
+            let seat: Seat;
+            if (match.seats[0].userId === userId) seat = 0;
+            else if (match.seats[1].userId === userId) seat = 1;
+            else return;
+            const other: Seat = seat === 0 ? 1 : 0;
+            // Only the player to move, on their first action, after the opponent has moved.
+            if (match.state.turn !== seat || match.moved[seat] || !match.moved[other]) return;
+
+            // Swap which player sits in which seat; the board is unchanged.
+            match.seats = [match.seats[1], match.seats[0]];
+            match.moved = [match.moved[1], match.moved[0]];
+            match.pieUsed = true;
+
+            for (const st of [0, 1] as Seat[]) {
+                const u = lobby.users.get(match.seats[st].userId);
+                const s = u && socketForUser(io, u.socketId);
+                if (s) s.emit('mancala_match_started', startedPayload(match, st));
+            }
+            // Update spectators' player order (players ignore this for their own match).
+            io.to(matchRoom(match.id)).emit('mancala_spectate_state', {
+                matchId: match.id,
+                players: match.seats,
+                state: match.state,
+                config: match.config,
+            });
+            broadcastLobby(io, lobby);
         });
 
         socket.on('mancala_spectate', (data: { matchId: string }) => {
@@ -252,6 +319,7 @@ export function setupMancalaHandlers(io: Server): void {
                 matchId: match.id,
                 players: match.seats,
                 state: match.state,
+                config: match.config,
             });
         });
 
@@ -295,8 +363,8 @@ export function setupMancalaHandlers(io: Server): void {
             }
 
             // Clear any pending challenges involving this user.
-            for (const [challenger, target] of lobby.challenges) {
-                if (challenger === userId || target === userId) lobby.challenges.delete(challenger);
+            for (const [challenger, pending] of lobby.challenges) {
+                if (challenger === userId || pending.target === userId) lobby.challenges.delete(challenger);
             }
 
             lobby.users.delete(userId);

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Avatar, Button, Group, Loader, Modal, Paper, Stack, Text, Title } from '@mantine/core';
+import { Avatar, Button, Group, Loader, Modal, Paper, Stack, Switch, Text, Title } from '@mantine/core';
 import { useDiscordAuth } from '@/lib/hooks';
-import { useMancalaLobby, useMockMancala, MancalaLobby, LobbyPlayer, LastMove, MatchSummary, SOW_STEP_MS } from '@/lib/mancala-client';
-import { MancalaState, STORE, Seat, legalMoves, pitsForSeat, sowPath } from '@/lib/mancala-engine';
+import { useMancalaLobby, useMockMancala, MancalaLobby, LobbyPlayer, LastMove, MatchSummary, canSwap, SOW_STEP_MS } from '@/lib/mancala-client';
+import { MancalaState, RuleConfig, DEFAULT_RULES, STORE, Seat, legalMoves, pitsForSeat, sowSequence } from '@/lib/mancala-engine';
 import { playTick, playScoop, playCapture, playExtraTurn, playWin, playLose, useMute } from '@/lib/mancala-sound';
 import classes from './mancala.module.css';
 
@@ -16,6 +16,26 @@ function avatarUrl(userId: string, avatar?: string | null): string | undefined {
     if (!avatar) return undefined;
     const ext = avatar.startsWith('a_') ? 'gif' : 'png';
     return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.${ext}?size=64`;
+}
+
+type Orientation = 'horizontal' | 'vertical';
+
+// Per-client cosmetic board orientation, persisted to localStorage.
+function useBoardOrientation(): { orientation: Orientation; toggle: () => void } {
+    const [orientation, setOrientation] = useState<Orientation>('horizontal');
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.localStorage.getItem('mancala-orientation') === 'vertical') {
+            setOrientation('vertical');
+        }
+    }, []);
+    const toggle = useCallback(() => {
+        setOrientation((prev) => {
+            const next: Orientation = prev === 'horizontal' ? 'vertical' : 'horizontal';
+            if (typeof window !== 'undefined') window.localStorage.setItem('mancala-orientation', next);
+            return next;
+        });
+    }, []);
+    return { orientation, toggle };
 }
 
 // Deterministic pseudo-random in [0,1) from a seed, so each stone keeps a stable
@@ -90,9 +110,9 @@ export default function MancalaPage() {
             ) : (
                 <LobbyView
                     lobby={lobby}
-                    onPractice={() => {
+                    onPractice={(config) => {
                         setPracticing(true);
-                        practice.sendChallenge('');
+                        practice.sendChallenge('', config);
                     }}
                 />
             )}
@@ -100,8 +120,17 @@ export default function MancalaPage() {
     );
 }
 
-function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () => void }) {
+type Configuring = { kind: 'challenge'; userId: string } | { kind: 'practice' } | null;
+
+function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: (config: RuleConfig) => void }) {
     const { players, liveMatches, incoming, outgoing, sendChallenge, respondToChallenge, dismissOutgoing, spectate } = lobby;
+    const [configuring, setConfiguring] = useState<Configuring>(null);
+
+    const confirmRules = (config: RuleConfig) => {
+        if (configuring?.kind === 'challenge') sendChallenge(configuring.userId, config);
+        else if (configuring?.kind === 'practice') onPractice(config);
+        setConfiguring(null);
+    };
 
     return (
         <Stack align="center" gap="lg" className={classes.lobby}>
@@ -121,7 +150,9 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                         No one else is online. Ask a friend to open Mancala, or practice against the bot.
                     </Text>
                 ) : (
-                    players.map((p) => <PlayerRow key={p.userId} player={p} onChallenge={() => sendChallenge(p.userId)} />)
+                    players.map((p) => (
+                        <PlayerRow key={p.userId} player={p} onChallenge={() => setConfiguring({ kind: 'challenge', userId: p.userId })} />
+                    ))
                 )}
             </Stack>
 
@@ -134,9 +165,17 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                 </Stack>
             )}
 
-            <Button variant="light" color="mauve" radius="xl" onClick={onPractice}>
+            <Button variant="light" color="mauve" radius="xl" onClick={() => setConfiguring({ kind: 'practice' })}>
                 🤖 Practice vs Bot
             </Button>
+
+            <RulesModal
+                key={configuring ? (configuring.kind === 'challenge' ? configuring.userId : 'practice') : 'none'}
+                opened={!!configuring}
+                onClose={() => setConfiguring(null)}
+                onConfirm={confirmRules}
+                confirmLabel={configuring?.kind === 'practice' ? 'Start game' : 'Send challenge'}
+            />
 
             <Modal
                 opened={!!incoming}
@@ -153,6 +192,7 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                             <Text fw={700}>{incoming.challenger.username}</Text>
                         </Group>
                         <Text size="sm" c="dimmed">wants to play Mancala with you.</Text>
+                        <RuleChips config={incoming.config} />
                         <Group grow>
                             <Button variant="default" onClick={() => respondToChallenge(false)}>Decline</Button>
                             <Button color="green" onClick={() => respondToChallenge(true)}>Accept</Button>
@@ -178,6 +218,91 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                 )}
             </Modal>
         </Stack>
+    );
+}
+
+const PRESETS: { key: string; label: string; emoji: string; config: RuleConfig }[] = [
+    { key: 'classic', label: 'Classic', emoji: '🪨', config: { multiLap: false, pieRule: false, randomStart: false } },
+    { key: 'relay', label: 'Relay', emoji: '🔁', config: { multiLap: true, pieRule: false, randomStart: false } },
+    { key: 'balanced', label: 'Balanced', emoji: '⚖️', config: { multiLap: false, pieRule: true, randomStart: false } },
+    { key: 'scramble', label: 'Scramble', emoji: '🎲', config: { multiLap: false, pieRule: false, randomStart: true } },
+    { key: 'chaos', label: 'Chaos', emoji: '🌪️', config: { multiLap: true, pieRule: true, randomStart: true } },
+];
+
+function sameConfig(a: RuleConfig, b: RuleConfig): boolean {
+    return a.multiLap === b.multiLap && a.pieRule === b.pieRule && a.randomStart === b.randomStart;
+}
+
+function ruleLabels(c: RuleConfig): string[] {
+    const out = [c.multiLap ? 'Relay' : 'Single-lap'];
+    if (c.pieRule) out.push('Pie rule');
+    if (c.randomStart) out.push('Random start');
+    return out;
+}
+
+function RuleChips({ config }: { config: RuleConfig }) {
+    return (
+        <Group gap={5} justify="center">
+            {ruleLabels(config).map((l) => (
+                <span key={l} className={classes.ruleChip}>{l}</span>
+            ))}
+        </Group>
+    );
+}
+
+function RulesModal({
+    opened,
+    onClose,
+    onConfirm,
+    confirmLabel,
+}: {
+    opened: boolean;
+    onClose: () => void;
+    onConfirm: (config: RuleConfig) => void;
+    confirmLabel: string;
+}) {
+    const [cfg, setCfg] = useState<RuleConfig>(DEFAULT_RULES);
+
+    return (
+        <Modal opened={opened} onClose={onClose} centered size="sm" title="Game rules">
+            <Stack gap="md">
+                <Group gap="xs">
+                    {PRESETS.map((p) => (
+                        <Button
+                            key={p.key}
+                            size="xs"
+                            radius="xl"
+                            color="mauve"
+                            variant={sameConfig(cfg, p.config) ? 'filled' : 'default'}
+                            onClick={() => setCfg(p.config)}
+                        >
+                            {p.emoji} {p.label}
+                        </Button>
+                    ))}
+                </Group>
+
+                <Stack gap="xs">
+                    <Text size="xs" fw={700} c="dimmed" tt="uppercase">Advanced</Text>
+                    <Switch
+                        label="Multi-lap (relay sowing)"
+                        checked={cfg.multiLap}
+                        onChange={(e) => setCfg((c) => ({ ...c, multiLap: e.currentTarget.checked }))}
+                    />
+                    <Switch
+                        label="Pie rule (swap after first move)"
+                        checked={cfg.pieRule}
+                        onChange={(e) => setCfg((c) => ({ ...c, pieRule: e.currentTarget.checked }))}
+                    />
+                    <Switch
+                        label="Random start (mirrored, same total)"
+                        checked={cfg.randomStart}
+                        onChange={(e) => setCfg((c) => ({ ...c, randomStart: e.currentTarget.checked }))}
+                    />
+                </Stack>
+
+                <Button color="mauve" radius="xl" onClick={() => onConfirm(cfg)}>{confirmLabel}</Button>
+            </Stack>
+        </Modal>
     );
 }
 
@@ -220,6 +345,7 @@ function LiveMatchRow({ match, onWatch }: { match: MatchSummary; onWatch: () => 
 
 function SpectateView({ lobby }: { lobby: MancalaLobby }) {
     const { spectating, stopSpectating } = lobby;
+    const { orientation, toggle: toggleOrient } = useBoardOrientation();
     if (!spectating) return null;
 
     const { players, state, ended } = spectating;
@@ -243,7 +369,17 @@ function SpectateView({ lobby }: { lobby: MancalaLobby }) {
                 <Text component="span" size="sm" c="dimmed" className={classes.leaveLink} onClick={stopSpectating}>
                     ← stop watching
                 </Text>
-                <Text size="sm" c="teal">👀 spectating</Text>
+                <Group gap="sm">
+                    <Text size="sm" c="teal">👀 spectating</Text>
+                    <Text
+                        component="span"
+                        className={classes.muteBtn}
+                        onClick={toggleOrient}
+                        title={orientation === 'horizontal' ? 'Vertical board' : 'Horizontal board'}
+                    >
+                        {orientation === 'horizontal' ? '↕' : '↔'}
+                    </Text>
+                </Group>
             </Group>
 
             <Group gap="xs" justify="center">
@@ -252,13 +388,15 @@ function SpectateView({ lobby }: { lobby: MancalaLobby }) {
                 <PlayerChip player={p0} active={!isOver && state.turn === 0} />
             </Group>
 
+            <RuleChips config={spectating.config} />
+
             {isOver ? (
                 <div className={`${classes.banner} ${classes.banner_draw}`}>{status}</div>
             ) : (
                 <Text fw={700} className={classes.turnText} c="dimmed">{status}</Text>
             )}
 
-            <Board key={spectating.matchId} state={state} lastMove={lobby.lastMove} seat={0} interactive={false} onPit={() => {}} />
+            <Board key={spectating.matchId} state={state} lastMove={lobby.lastMove} seat={0} config={spectating.config} orientation={orientation} interactive={false} onPit={() => {}} />
 
             {isOver && (
                 <Button variant="default" radius="xl" onClick={stopSpectating}>Back to lobby</Button>
@@ -277,8 +415,9 @@ function PlayerChip({ player, active }: { player: { userId: string; username: st
 }
 
 function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId: string; onLeave: () => void }) {
-    const { match, result, lastMove, sendMove, rematch } = lobby;
+    const { match, result, lastMove, sendMove, swap, rematch } = lobby;
     const { muted, toggle } = useMute();
+    const { orientation, toggle: toggleOrient } = useBoardOrientation();
     if (!match) return null;
 
     const { state, seat, opponent } = match;
@@ -286,6 +425,7 @@ function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId
     const isOver = state.status === 'over';
     const myTurn = !isOver && state.turn === seat;
     const outcome = getOutcome(state, seat, result, myUserId);
+    const swapAvailable = canSwap(match);
 
     return (
         <Stack align="center" gap="md" className={classes.matchView}>
@@ -300,6 +440,14 @@ function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId
                         <Avatar src={avatarUrl(opponent.userId, opponent.avatar)} radius="xl" size="sm" />
                         <Text size="sm">vs {opponent.username}</Text>
                     </Group>
+                    <Text
+                        component="span"
+                        className={classes.muteBtn}
+                        onClick={toggleOrient}
+                        title={orientation === 'horizontal' ? 'Vertical board' : 'Horizontal board'}
+                    >
+                        {orientation === 'horizontal' ? '↕' : '↔'}
+                    </Text>
                     <Text component="span" className={classes.muteBtn} onClick={toggle} title={muted ? 'Unmute' : 'Mute'}>
                         {muted ? '🔇' : '🔊'}
                     </Text>
@@ -315,12 +463,21 @@ function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId
                     </div>
                 </Stack>
             ) : (
-                <Text fw={700} className={classes.turnText} c={myTurn ? 'green' : 'dimmed'}>
-                    {myTurn ? '✨ Your turn' : `${opponent.username}'s turn`}
-                </Text>
+                <Stack align="center" gap={6}>
+                    <Text fw={700} className={classes.turnText} c={myTurn ? 'green' : 'dimmed'}>
+                        {myTurn ? '✨ Your turn' : `${opponent.username}'s turn`}
+                    </Text>
+                    <RuleChips config={match.config} />
+                </Stack>
             )}
 
-            <Board key={match.matchId} state={state} lastMove={lastMove} seat={seat} onPit={sendMove} />
+            {swapAvailable && (
+                <Button size="xs" color="teal" radius="xl" variant="light" onClick={swap}>
+                    ⇄ Swap sides (pie rule)
+                </Button>
+            )}
+
+            <Board key={match.matchId} state={state} lastMove={lastMove} seat={seat} config={match.config} orientation={orientation} onPit={sendMove} />
 
             {isOver && (
                 <Group>
@@ -372,14 +529,18 @@ function Board({
     state,
     lastMove,
     seat,
+    config,
     onPit,
     interactive = true,
+    orientation = 'horizontal',
 }: {
     state: MancalaState;
     lastMove: LastMove | null;
     seat: Seat;
+    config: RuleConfig;
     onPit: (pit: number) => void;
     interactive?: boolean;
+    orientation?: Orientation;
 }) {
     // `display` is the visually-shown board, which lags the authoritative state
     // during the sow animation, then settles to state.pits when it ends.
@@ -462,74 +623,91 @@ function Board({
             setAnimating(true);
 
             const from = displayRef.current.slice();
-            const path = sowPath(from, move.seat, move.pit);
+            const laps = sowSequence(from, move.seat, move.pit, config);
             const work = from.slice();
-            work[move.pit] = 0;
-            setBoard(work.slice()); // scoop the whole handful out of the pit
-            playScoop();
 
-            path.forEach((idx, i) => {
-                const prevIdx = i === 0 ? move.pit : path[i - 1];
-                const startAt = SCOOP_PAUSE_MS + i * SOW_STEP_MS;
-                const hopT = setTimeout(() => hopStone(prevIdx, idx, i), startAt);
-                const landT = setTimeout(() => {
-                    work[idx] += 1;
-                    setBoard(work.slice());
-                    playTick(i, idx === STORE[0] || idx === STORE[1]);
-                    setJigglePit(idx);
-                    const jc = setTimeout(() => setJigglePit((j) => (j === idx ? null : j)), 220);
-                    timersRef.current.push(jc);
-                }, startAt + SOW_STEP_MS);
-                timersRef.current.push(hopT, landT);
-            });
+            if (laps.length === 0) {
+                setBoard(state.pits.slice());
+                setAnimating(false);
+            } else {
+                // Walk the laps on a shared timeline: scoop a pit, hop a stone into each
+                // well, relay into the next lap, and finally settle to the true state.
+                let cursor = 0;
+                let hopSeq = 0;
+                laps.forEach((lap) => {
+                    const scoopAt = cursor;
+                    const scoopT = setTimeout(() => {
+                        work[lap.from] = 0;
+                        setBoard(work.slice());
+                        playScoop();
+                    }, scoopAt);
+                    timersRef.current.push(scoopT);
+                    cursor += SCOOP_PAUSE_MS;
 
-            const settleAt = SCOOP_PAUSE_MS + path.length * SOW_STEP_MS + 60;
-            const settle = setTimeout(() => {
-                const changed: number[] = [];
-                for (let p = 0; p < 14; p += 1) {
-                    if (p === STORE[0] || p === STORE[1]) continue;
-                    if (state.pits[p] < work[p]) changed.push(p);
-                }
+                    lap.path.forEach((idx, i) => {
+                        const prevIdx = i === 0 ? lap.from : lap.path[i - 1];
+                        const startAt = cursor + i * SOW_STEP_MS;
+                        const seq = hopSeq;
+                        hopSeq += 1;
+                        const hopT = setTimeout(() => hopStone(prevIdx, idx, seq), startAt);
+                        const landT = setTimeout(() => {
+                            work[idx] += 1;
+                            setBoard(work.slice());
+                            playTick(i, idx === STORE[0] || idx === STORE[1]);
+                            setJigglePit(idx);
+                            const jc = setTimeout(() => setJigglePit((j) => (j === idx ? null : j)), 220);
+                            timersRef.current.push(jc);
+                        }, startAt + SOW_STEP_MS);
+                        timersRef.current.push(hopT, landT);
+                    });
+                    cursor += lap.path.length * SOW_STEP_MS + 80;
+                });
 
-                if (changed.length > 0) {
-                    if (state.status === 'over') {
-                        // End-game sweep: each side's leftovers cascade into its own store.
-                        changed.forEach((p) => flyToStore(p, STORE[p <= 5 ? 0 : 1], work[p] - state.pits[p]));
-                    } else {
-                        // Capture into the mover's store.
-                        const storeIdx = STORE[move.seat];
-                        setFlashPits(changed);
-                        setCelebrateStore(storeIdx);
-                        playCapture();
-                        changed.forEach((p) => flyToStore(p, storeIdx, work[p] - state.pits[p]));
-                        const clear = setTimeout(() => {
-                            setFlashPits([]);
-                            setCelebrateStore(null);
-                        }, 850);
-                        timersRef.current.push(clear);
+                const lastLap = laps[laps.length - 1];
+                const finalLanding = lastLap.path[lastLap.path.length - 1];
+
+                const settle = setTimeout(() => {
+                    const changed: number[] = [];
+                    for (let p = 0; p < 14; p += 1) {
+                        if (p === STORE[0] || p === STORE[1]) continue;
+                        if (state.pits[p] < work[p]) changed.push(p);
                     }
-                }
 
-                // Extra turn: the last stone dropped into the mover's own store.
-                if (state.status === 'playing' && path.length > 0 && path[path.length - 1] === STORE[move.seat]) {
-                    setExtraTurnBy(move.seat);
-                    setCelebrateStore(STORE[move.seat]);
-                    if (move.seat === seat || !interactive) playExtraTurn();
-                    const clr = setTimeout(() => {
-                        setExtraTurnBy(null);
-                        setCelebrateStore(null);
-                    }, 1300);
-                    timersRef.current.push(clr);
-                }
+                    if (changed.length > 0) {
+                        if (state.status === 'over') {
+                            // End-game sweep: each side's leftovers cascade into its own store.
+                            changed.forEach((p) => flyToStore(p, STORE[p <= 5 ? 0 : 1], work[p] - state.pits[p]));
+                        } else {
+                            // Capture into the mover's store.
+                            const storeIdx = STORE[move.seat];
+                            setFlashPits(changed);
+                            setCelebrateStore(storeIdx);
+                            playCapture();
+                            changed.forEach((p) => flyToStore(p, storeIdx, work[p] - state.pits[p]));
+                            const clear = setTimeout(() => {
+                                setFlashPits([]);
+                                setCelebrateStore(null);
+                            }, 850);
+                            timersRef.current.push(clear);
+                        }
+                    }
 
-                setBoard(state.pits.slice());
-                setAnimating(false);
-            }, settleAt);
-            timersRef.current.push(settle);
+                    // Extra turn: the last stone dropped into the mover's own store.
+                    if (state.status === 'playing' && finalLanding === STORE[move.seat]) {
+                        setExtraTurnBy(move.seat);
+                        setCelebrateStore(STORE[move.seat]);
+                        if (move.seat === seat || !interactive) playExtraTurn();
+                        const clr = setTimeout(() => {
+                            setExtraTurnBy(null);
+                            setCelebrateStore(null);
+                        }, 1300);
+                        timersRef.current.push(clr);
+                    }
 
-            if (path.length === 0) {
-                setBoard(state.pits.slice());
-                setAnimating(false);
+                    setBoard(state.pits.slice());
+                    setAnimating(false);
+                }, cursor + 60);
+                timersRef.current.push(settle);
             }
         } else if (!lastMove) {
             animatedMoveRef.current = null;
@@ -562,13 +740,16 @@ function Board({
         pitEls.current[idx] = el;
     };
 
+    const vertical = orientation === 'vertical';
+
     return (
-        <div className={classes.board} ref={boardRef}>
+        <div className={`${classes.board} ${vertical ? classes.vertical : ''}`} ref={boardRef}>
             <Store
                 value={display[STORE[oppSeat]]}
                 seed={STORE[oppSeat]}
                 variant="opp"
                 position="left"
+                vertical={vertical}
                 celebrate={celebrateStore === STORE[oppSeat]}
                 elRef={setPitEl(STORE[oppSeat])}
             />
@@ -607,6 +788,7 @@ function Board({
                 seed={STORE[seat]}
                 variant="mine"
                 position="right"
+                vertical={vertical}
                 celebrate={celebrateStore === STORE[seat]}
                 elRef={setPitEl(STORE[seat])}
             />
@@ -653,10 +835,11 @@ function Board({
     );
 }
 
-function StoneField({ count, store = false, seed = 0 }: { count: number; store?: boolean; seed?: number }) {
+function StoneField({ count, store = false, seed = 0, wide = false }: { count: number; store?: boolean; seed?: number; wide?: boolean }) {
     const cap = store ? 40 : 22;
     const visible = Math.min(count, cap);
-    const size = stoneWidthPct(count, store);
+    // A wide (vertical-orientation) store is short, so keep its stones smaller.
+    const size = Math.min(stoneWidthPct(count, store), wide ? 13 : 100);
     const base = seed * 100 + 1; // unique scatter per well, stable across renders
 
     return (
@@ -669,10 +852,10 @@ function StoneField({ count, store = false, seed = 0 }: { count: number; store?:
                 let x: number;
                 let y: number;
                 if (store) {
-                    // Elongated vertical scatter for the tall store.
-                    const xSpread = Math.max(0, 50 - size / 2 - 5);
-                    x = (r1 * 2 - 1) * xSpread;
-                    y = (r2 * 2 - 1) * 45;
+                    // Elongated along the store's long axis (vertical normally, horizontal when wide).
+                    const tight = Math.max(0, 50 - size / 2 - 5);
+                    x = (r1 * 2 - 1) * (wide ? 45 : tight);
+                    y = (r2 * 2 - 1) * (wide ? tight : 45);
                 } else {
                     // Uniform scatter within the circular pit.
                     const radius = Math.sqrt(r2) * (50 - size / 2 - 4);
@@ -747,6 +930,7 @@ function Store({
     seed,
     variant,
     position,
+    vertical,
     celebrate,
     elRef,
 }: {
@@ -754,6 +938,7 @@ function Store({
     seed: number;
     variant: 'mine' | 'opp';
     position: 'left' | 'right';
+    vertical?: boolean;
     celebrate?: boolean;
     elRef?: (el: HTMLDivElement | null) => void;
 }) {
@@ -764,7 +949,7 @@ function Store({
                 position === 'left' ? classes.storeLeft : classes.storeRight
             } ${celebrate ? classes.storeCelebrate : ''}`}
         >
-            <StoneField count={value} store seed={seed} />
+            <StoneField count={value} store seed={seed} wide={vertical} />
             <span className={classes.storeCount}>{value}</span>
         </div>
     );
