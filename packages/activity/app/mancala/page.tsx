@@ -18,13 +18,36 @@ function avatarUrl(userId: string, avatar?: string | null): string | undefined {
     return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.${ext}?size=64`;
 }
 
-// Marbles shrink as a pit/store fills so a big pile stays tidy instead of overflowing.
-function marbleSize(count: number, store: boolean): number {
-    if (count <= 4) return store ? 14 : 16;
-    if (count <= 8) return 13;
-    if (count <= 12) return 10;
-    if (count <= 18) return 8;
-    return store ? 7 : 6;
+// Deterministic pseudo-random in [0,1) from a seed, so each stone keeps a stable
+// scattered position/shape across re-renders (no jittering on every update).
+function rand(seed: number): number {
+    const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+// Irregular, non-spherical "pebble" outlines.
+const STONE_SHAPES = [
+    '49% 51% 48% 52% / 53% 47% 53% 47%',
+    '53% 47% 52% 48% / 47% 52% 48% 53%',
+    '47% 53% 50% 50% / 52% 48% 52% 48%',
+    '52% 48% 47% 53% / 48% 53% 47% 52%',
+    '50% 50% 53% 47% / 51% 49% 51% 49%',
+];
+
+// Stone width as a % of its container — shrinks as the pit/store fills so a big
+// pile stays inside the box.
+function stoneWidthPct(count: number, store: boolean): number {
+    if (store) {
+        if (count <= 6) return 24;
+        if (count <= 14) return 19;
+        if (count <= 26) return 15;
+        return 12;
+    }
+    if (count <= 4) return 38;
+    if (count <= 8) return 31;
+    if (count <= 12) return 25;
+    if (count <= 18) return 21;
+    return 17;
 }
 
 export default function MancalaPage() {
@@ -537,19 +560,59 @@ function Board({
     );
 }
 
-function Stones({ count, store = false }: { count: number; store?: boolean }) {
-    const cap = store ? 30 : 18;
+function StoneField({ count, store = false }: { count: number; store?: boolean }) {
+    const cap = store ? 40 : 22;
     const visible = Math.min(count, cap);
-    const size = marbleSize(count, store);
+    const size = stoneWidthPct(count, store);
+
     return (
-        <div className={classes.stones} style={{ '--stone-size': `${size}px` } as React.CSSProperties}>
-            {Array.from({ length: visible }).map((_, i) => (
-                <span
-                    key={i}
-                    className={classes.stone}
-                    style={{ '--c': MARBLE_COLORS[i % MARBLE_COLORS.length] } as React.CSSProperties}
-                />
-            ))}
+        <div className={classes.stoneField}>
+            {Array.from({ length: visible }).map((_, i) => {
+                const r1 = rand(i + 1);
+                const r2 = rand(i * 1.7 + 7.3);
+                const r3 = rand(i * 2.3 + 13.1);
+
+                let x: number;
+                let y: number;
+                if (store) {
+                    // Elongated vertical scatter for the tall store.
+                    const xSpread = Math.max(0, 50 - size / 2 - 5);
+                    x = (r1 * 2 - 1) * xSpread;
+                    y = (r2 * 2 - 1) * 45;
+                } else {
+                    // Uniform scatter within the circular pit.
+                    const radius = Math.sqrt(r2) * (50 - size / 2 - 4);
+                    const angle = r1 * Math.PI * 2;
+                    x = Math.cos(angle) * radius;
+                    y = Math.sin(angle) * radius;
+                }
+
+                return (
+                    <span
+                        key={i}
+                        className={classes.stonePoint}
+                        style={
+                            {
+                                left: `${50 + x}%`,
+                                top: `${50 + y}%`,
+                                width: `${size}%`,
+                                aspectRatio: `${(0.86 + r3 * 0.28).toFixed(2)}`,
+                                transform: `translate(-50%, -50%) rotate(${(r3 * 90 - 45).toFixed(1)}deg)`,
+                            } as React.CSSProperties
+                        }
+                    >
+                        <span
+                            className={classes.stone}
+                            style={
+                                {
+                                    borderRadius: STONE_SHAPES[i % STONE_SHAPES.length],
+                                    '--c': MARBLE_COLORS[i % MARBLE_COLORS.length],
+                                } as React.CSSProperties
+                            }
+                        />
+                    </span>
+                );
+            })}
         </div>
     );
 }
@@ -575,7 +638,7 @@ function Pit({
             disabled={!clickable}
             onClick={onClick}
         >
-            <Stones count={value} />
+            <StoneField count={value} />
             {value > 0 && <span className={classes.pitCount}>{value}</span>}
         </button>
     );
@@ -601,8 +664,8 @@ function Store({
                 position === 'left' ? classes.storeLeft : classes.storeRight
             } ${celebrate ? classes.storeCelebrate : ''}`}
         >
+            <StoneField count={value} store />
             <span className={classes.storeCount}>{value}</span>
-            <Stones count={value} store />
         </div>
     );
 }
