@@ -252,7 +252,19 @@
     100% { transform: translateY(0) scale(1); }
 }
 
-/* ---- Flying capture stones ---- */
+/* ---- Pit jiggle when a stone lands ---- */
+
+.pitJiggle {
+    animation: pit-jiggle 0.22s ease;
+}
+
+@keyframes pit-jiggle {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.07); }
+    100% { transform: scale(1); }
+}
+
+/* ---- Flying / hopping stones ---- */
 
 .overlay {
     position: absolute;
@@ -260,6 +272,28 @@
     pointer-events: none;
     overflow: visible;
     z-index: 5;
+}
+
+.hopStone {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-radius: 52% 48% 50% 50% / 50% 52% 48% 50%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+        radial-gradient(circle at 55% 60%, var(--c, #c6a0f6), color-mix(in srgb, var(--c, #c6a0f6) 60%, black));
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+    animation-name: hop;
+    animation-timing-function: ease-in-out;
+    animation-fill-mode: forwards;
+}
+
+/* Short arc from one well to the next (peak lift at the midpoint). */
+@keyframes hop {
+    0% { transform: translate(-50%, -50%); }
+    50% { transform: translate(calc(-50% + var(--dx, 0px) / 2), calc(-50% + var(--dy, 0px) / 2 - 18px)) scale(1.12); }
+    100% { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))); }
 }
 
 .flyingStone {
@@ -314,6 +348,45 @@
     0% { transform: scale(0.6); opacity: 0; }
     70% { transform: scale(1.08); opacity: 1; }
     100% { transform: scale(1); }
+}
+
+.scoreLine {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--mantine-color-dark-0);
+}
+
+.scoreDash {
+    color: var(--mantine-color-dark-3);
+    margin: 0 0.15rem;
+}
+
+/* ---- Extra-turn flourish ---- */
+
+.extraTurn {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 8;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--mantine-color-dark-9);
+    background: linear-gradient(120deg, var(--mantine-color-mauve-3), var(--mantine-color-teal-3));
+    box-shadow: 0 4px 18px rgba(198, 160, 246, 0.6);
+    pointer-events: none;
+    animation: extra-turn 1.3s ease forwards;
+}
+
+@keyframes extra-turn {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+    15% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
+    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    80% { transform: translate(-50%, -70%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -110%) scale(0.9); opacity: 0; }
 }
 
 /* ---- Confetti ---- */

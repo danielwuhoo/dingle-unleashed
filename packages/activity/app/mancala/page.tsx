@@ -6,7 +6,7 @@ import { Avatar, Button, Group, Loader, Modal, Paper, Stack, Text, Title } from 
 import { useDiscordAuth } from '@/lib/hooks';
 import { useMancalaLobby, useMockMancala, MancalaLobby, LobbyPlayer, LastMove, MatchSummary, SOW_STEP_MS } from '@/lib/mancala-client';
 import { MancalaState, STORE, Seat, legalMoves, pitsForSeat, sowPath } from '@/lib/mancala-engine';
-import { playTick, playCapture, playWin, playLose, useMute } from '@/lib/mancala-sound';
+import { playTick, playScoop, playCapture, playExtraTurn, playWin, playLose, useMute } from '@/lib/mancala-sound';
 import classes from './mancala.module.css';
 
 // Catppuccin accent palette for the marbles / confetti.
@@ -282,6 +282,7 @@ function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId
     if (!match) return null;
 
     const { state, seat, opponent } = match;
+    const oppSeat: Seat = seat === 0 ? 1 : 0;
     const isOver = state.status === 'over';
     const myTurn = !isOver && state.turn === seat;
     const outcome = getOutcome(state, seat, result, myUserId);
@@ -306,7 +307,13 @@ function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId
             </Group>
 
             {isOver ? (
-                <div className={`${classes.banner} ${classes[`banner_${outcome}`]}`}>{bannerText(outcome)}</div>
+                <Stack align="center" gap={6}>
+                    <div className={`${classes.banner} ${classes[`banner_${outcome}`]}`}>{bannerText(outcome)}</div>
+                    <div className={classes.scoreLine}>
+                        <CountUp value={state.pits[STORE[seat]]} /> <span className={classes.scoreDash}>–</span>{' '}
+                        <CountUp value={state.pits[STORE[oppSeat]]} />
+                    </div>
+                </Stack>
             ) : (
                 <Text fw={700} className={classes.turnText} c={myTurn ? 'green' : 'dimmed'}>
                     {myTurn ? '✨ Your turn' : `${opponent.username}'s turn`}
@@ -349,6 +356,18 @@ interface FlyingStone {
     delay: number;
 }
 
+interface HopStone {
+    id: string;
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+    color: string;
+}
+
+// Brief hold of the scooped handful before the first stone is dropped.
+const SCOOP_PAUSE_MS = 160;
+
 function Board({
     state,
     lastMove,
@@ -368,7 +387,10 @@ function Board({
     const [animating, setAnimating] = useState(false);
     const [flashPits, setFlashPits] = useState<number[]>([]);
     const [celebrateStore, setCelebrateStore] = useState<number | null>(null);
+    const [jigglePit, setJigglePit] = useState<number | null>(null);
+    const [extraTurnBy, setExtraTurnBy] = useState<Seat | null>(null);
     const [flying, setFlying] = useState<FlyingStone[]>([]);
+    const [hops, setHops] = useState<HopStone[]>([]);
 
     const displayRef = useRef<number[]>(state.pits);
     const animatedMoveRef = useRef<LastMove | null>(null);
@@ -388,26 +410,41 @@ function Board({
 
     useEffect(() => clearTimers, []);
 
-    // Spawn marbles that fly from a captured pit into the store.
-    const flyToStore = (fromIdx: number, storeIdx: number, count: number) => {
+    const centerOf = (idx: number) => {
         const board = boardRef.current;
-        const fromEl = pitEls.current[fromIdx];
-        const storeEl = pitEls.current[storeIdx];
-        if (!board || !fromEl || !storeEl) return;
+        const el = pitEls.current[idx];
+        if (!board || !el) return null;
         const b = board.getBoundingClientRect();
-        const f = fromEl.getBoundingClientRect();
-        const s = storeEl.getBoundingClientRect();
-        const x = f.left + f.width / 2 - b.left;
-        const y = f.top + f.height / 2 - b.top;
-        const dx = s.left + s.width / 2 - b.left - x;
-        const dy = s.top + s.height / 2 - b.top - y;
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2 - b.left, y: r.top + r.height / 2 - b.top };
+    };
+
+    // A single stone hopping from one well to the next as the handful is dropped.
+    const hopStone = (fromIdx: number, toIdx: number, i: number) => {
+        const from = centerOf(fromIdx);
+        const to = centerOf(toIdx);
+        if (!from || !to) return;
+        const id = `hop-${i}-${Date.now()}-${Math.random()}`;
+        setHops((prev) => [
+            ...prev,
+            { id, x: from.x, y: from.y, dx: to.x - from.x, dy: to.y - from.y, color: MARBLE_COLORS[i % MARBLE_COLORS.length] },
+        ]);
+        const t = setTimeout(() => setHops((prev) => prev.filter((h) => h.id !== id)), SOW_STEP_MS + 140);
+        timersRef.current.push(t);
+    };
+
+    // Stones flying from a pit into a store (capture or end-game sweep).
+    const flyToStore = (fromIdx: number, storeIdx: number, count: number) => {
+        const from = centerOf(fromIdx);
+        const to = centerOf(storeIdx);
+        if (!from || !to) return;
         const n = Math.min(count, 6);
         const stones: FlyingStone[] = Array.from({ length: n }).map((_, k) => ({
             id: `${storeIdx}-${fromIdx}-${k}-${Date.now()}-${Math.random()}`,
-            x,
-            y,
-            dx,
-            dy,
+            x: from.x,
+            y: from.y,
+            dx: to.x - from.x,
+            dy: to.y - from.y,
             color: MARBLE_COLORS[(fromIdx + k) % MARBLE_COLORS.length],
             delay: k * 45,
         }));
@@ -428,43 +465,67 @@ function Board({
             const path = sowPath(from, move.seat, move.pit);
             const work = from.slice();
             work[move.pit] = 0;
-            setBoard(work.slice());
+            setBoard(work.slice()); // scoop the whole handful out of the pit
+            playScoop();
 
             path.forEach((idx, i) => {
-                const t = setTimeout(() => {
+                const prevIdx = i === 0 ? move.pit : path[i - 1];
+                const startAt = SCOOP_PAUSE_MS + i * SOW_STEP_MS;
+                const hopT = setTimeout(() => hopStone(prevIdx, idx, i), startAt);
+                const landT = setTimeout(() => {
                     work[idx] += 1;
                     setBoard(work.slice());
-                    playTick(i);
-                    if (i === path.length - 1) {
-                        const settle = setTimeout(() => {
-                            // Detect captures (pits that lost stones to the store mid-game).
-                            if (state.status === 'playing') {
-                                const captured: number[] = [];
-                                for (let p = 0; p < 14; p += 1) {
-                                    if (p === STORE[0] || p === STORE[1]) continue;
-                                    if (state.pits[p] < work[p]) captured.push(p);
-                                }
-                                if (captured.length > 0) {
-                                    const storeIdx = STORE[move.seat];
-                                    setFlashPits(captured);
-                                    setCelebrateStore(storeIdx);
-                                    playCapture();
-                                    captured.forEach((p) => flyToStore(p, storeIdx, work[p] - state.pits[p]));
-                                    const clear = setTimeout(() => {
-                                        setFlashPits([]);
-                                        setCelebrateStore(null);
-                                    }, 850);
-                                    timersRef.current.push(clear);
-                                }
-                            }
-                            setBoard(state.pits.slice());
-                            setAnimating(false);
-                        }, SOW_STEP_MS);
-                        timersRef.current.push(settle);
-                    }
-                }, (i + 1) * SOW_STEP_MS);
-                timersRef.current.push(t);
+                    playTick(i, idx === STORE[0] || idx === STORE[1]);
+                    setJigglePit(idx);
+                    const jc = setTimeout(() => setJigglePit((j) => (j === idx ? null : j)), 220);
+                    timersRef.current.push(jc);
+                }, startAt + SOW_STEP_MS);
+                timersRef.current.push(hopT, landT);
             });
+
+            const settleAt = SCOOP_PAUSE_MS + path.length * SOW_STEP_MS + 60;
+            const settle = setTimeout(() => {
+                const changed: number[] = [];
+                for (let p = 0; p < 14; p += 1) {
+                    if (p === STORE[0] || p === STORE[1]) continue;
+                    if (state.pits[p] < work[p]) changed.push(p);
+                }
+
+                if (changed.length > 0) {
+                    if (state.status === 'over') {
+                        // End-game sweep: each side's leftovers cascade into its own store.
+                        changed.forEach((p) => flyToStore(p, STORE[p <= 5 ? 0 : 1], work[p] - state.pits[p]));
+                    } else {
+                        // Capture into the mover's store.
+                        const storeIdx = STORE[move.seat];
+                        setFlashPits(changed);
+                        setCelebrateStore(storeIdx);
+                        playCapture();
+                        changed.forEach((p) => flyToStore(p, storeIdx, work[p] - state.pits[p]));
+                        const clear = setTimeout(() => {
+                            setFlashPits([]);
+                            setCelebrateStore(null);
+                        }, 850);
+                        timersRef.current.push(clear);
+                    }
+                }
+
+                // Extra turn: the last stone dropped into the mover's own store.
+                if (state.status === 'playing' && path.length > 0 && path[path.length - 1] === STORE[move.seat]) {
+                    setExtraTurnBy(move.seat);
+                    setCelebrateStore(STORE[move.seat]);
+                    if (move.seat === seat || !interactive) playExtraTurn();
+                    const clr = setTimeout(() => {
+                        setExtraTurnBy(null);
+                        setCelebrateStore(null);
+                    }, 1300);
+                    timersRef.current.push(clr);
+                }
+
+                setBoard(state.pits.slice());
+                setAnimating(false);
+            }, settleAt);
+            timersRef.current.push(settle);
 
             if (path.length === 0) {
                 setBoard(state.pits.slice());
@@ -505,6 +566,7 @@ function Board({
         <div className={classes.board} ref={boardRef}>
             <Store
                 value={display[STORE[oppSeat]]}
+                seed={STORE[oppSeat]}
                 variant="opp"
                 position="left"
                 celebrate={celebrateStore === STORE[oppSeat]}
@@ -513,7 +575,15 @@ function Board({
 
             <div className={classes.topRow}>
                 {oppPits.map((pit) => (
-                    <Pit key={pit} value={display[pit]} clickable={false} flash={flashPits.includes(pit)} elRef={setPitEl(pit)} />
+                    <Pit
+                        key={pit}
+                        value={display[pit]}
+                        seed={pit}
+                        clickable={false}
+                        flash={flashPits.includes(pit)}
+                        jiggle={jigglePit === pit}
+                        elRef={setPitEl(pit)}
+                    />
                 ))}
             </div>
 
@@ -522,8 +592,10 @@ function Board({
                     <Pit
                         key={pit}
                         value={display[pit]}
+                        seed={pit}
                         clickable={legal.includes(pit)}
                         flash={flashPits.includes(pit)}
+                        jiggle={jigglePit === pit}
                         elRef={setPitEl(pit)}
                         onClick={() => onPit(pit)}
                     />
@@ -532,6 +604,7 @@ function Board({
 
             <Store
                 value={display[STORE[seat]]}
+                seed={STORE[seat]}
                 variant="mine"
                 position="right"
                 celebrate={celebrateStore === STORE[seat]}
@@ -539,6 +612,22 @@ function Board({
             />
 
             <div className={classes.overlay}>
+                {hops.map((h) => (
+                    <span
+                        key={h.id}
+                        className={classes.hopStone}
+                        style={
+                            {
+                                left: h.x,
+                                top: h.y,
+                                animationDuration: `${SOW_STEP_MS}ms`,
+                                '--dx': `${h.dx}px`,
+                                '--dy': `${h.dy}px`,
+                                '--c': h.color,
+                            } as React.CSSProperties
+                        }
+                    />
+                ))}
                 {flying.map((s) => (
                     <span
                         key={s.id}
@@ -556,21 +645,26 @@ function Board({
                     />
                 ))}
             </div>
+
+            {extraTurnBy !== null && (
+                <div className={classes.extraTurn}>{extraTurnBy === seat ? 'Go again! ↻' : 'Extra turn ↻'}</div>
+            )}
         </div>
     );
 }
 
-function StoneField({ count, store = false }: { count: number; store?: boolean }) {
+function StoneField({ count, store = false, seed = 0 }: { count: number; store?: boolean; seed?: number }) {
     const cap = store ? 40 : 22;
     const visible = Math.min(count, cap);
     const size = stoneWidthPct(count, store);
+    const base = seed * 100 + 1; // unique scatter per well, stable across renders
 
     return (
         <div className={classes.stoneField}>
             {Array.from({ length: visible }).map((_, i) => {
-                const r1 = rand(i + 1);
-                const r2 = rand(i * 1.7 + 7.3);
-                const r3 = rand(i * 2.3 + 13.1);
+                const r1 = rand(base + i + 1);
+                const r2 = rand(base + i * 1.7 + 7.3);
+                const r3 = rand(base + i * 2.3 + 13.1);
 
                 let x: number;
                 let y: number;
@@ -619,14 +713,18 @@ function StoneField({ count, store = false }: { count: number; store?: boolean }
 
 function Pit({
     value,
+    seed,
     clickable,
     flash,
+    jiggle,
     onClick,
     elRef,
 }: {
     value: number;
+    seed: number;
     clickable: boolean;
     flash?: boolean;
+    jiggle?: boolean;
     onClick?: () => void;
     elRef?: (el: HTMLButtonElement | null) => void;
 }) {
@@ -634,11 +732,11 @@ function Pit({
         <button
             ref={elRef}
             type="button"
-            className={`${classes.pit} ${clickable ? classes.pitActive : ''} ${flash ? classes.pitFlash : ''}`}
+            className={`${classes.pit} ${clickable ? classes.pitActive : ''} ${flash ? classes.pitFlash : ''} ${jiggle ? classes.pitJiggle : ''}`}
             disabled={!clickable}
             onClick={onClick}
         >
-            <StoneField count={value} />
+            <StoneField count={value} seed={seed} />
             {value > 0 && <span className={classes.pitCount}>{value}</span>}
         </button>
     );
@@ -646,12 +744,14 @@ function Pit({
 
 function Store({
     value,
+    seed,
     variant,
     position,
     celebrate,
     elRef,
 }: {
     value: number;
+    seed: number;
     variant: 'mine' | 'opp';
     position: 'left' | 'right';
     celebrate?: boolean;
@@ -664,10 +764,28 @@ function Store({
                 position === 'left' ? classes.storeLeft : classes.storeRight
             } ${celebrate ? classes.storeCelebrate : ''}`}
         >
-            <StoneField count={value} store />
+            <StoneField count={value} store seed={seed} />
             <span className={classes.storeCount}>{value}</span>
         </div>
     );
+}
+
+function CountUp({ value }: { value: number }) {
+    const [n, setN] = useState(0);
+    useEffect(() => {
+        let raf = 0;
+        let startTs = 0;
+        const duration = 900;
+        const tick = (ts: number) => {
+            if (!startTs) startTs = ts;
+            const p = Math.min(1, (ts - startTs) / duration);
+            setN(Math.round(p * value));
+            if (p < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [value]);
+    return <>{n}</>;
 }
 
 function Confetti() {
