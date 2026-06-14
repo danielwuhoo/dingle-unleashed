@@ -13,24 +13,74 @@
     max-width: 460px;
 }
 
+.lobbyTitle {
+    background: linear-gradient(120deg, var(--mantine-color-mauve-4), var(--mantine-color-teal-4), var(--mantine-color-peach-4));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 2.4rem;
+}
+
+.playerRow {
+    transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.playerRow:hover {
+    transform: translateY(-1px);
+    border-color: var(--mantine-color-mauve-6);
+}
+
 .matchView {
+    position: relative;
     width: 100%;
     max-width: 600px;
 }
 
-/* Board: opponent store | 6 pits | my store, with two rows in the middle. */
+.leaveLink,
+.muteBtn {
+    cursor: pointer;
+    user-select: none;
+}
+
+.muteBtn {
+    font-size: 1.1rem;
+    line-height: 1;
+    opacity: 0.85;
+    transition: transform 0.1s ease;
+}
+
+.muteBtn:hover {
+    transform: scale(1.15);
+}
+
+.turnText {
+    letter-spacing: 0.02em;
+    animation: turn-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes turn-pulse {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+}
+
+/* ---- Board ---- */
+
 .board {
+    position: relative;
     display: grid;
     grid-template-columns: auto repeat(6, 1fr) auto;
     grid-template-rows: auto auto;
-    gap: 0.5rem;
+    gap: 0.55rem;
     align-items: stretch;
     width: 100%;
     max-width: 560px;
-    padding: 0.75rem;
-    border-radius: 1rem;
-    background: var(--mantine-color-dark-7);
+    padding: 0.85rem;
+    border-radius: 1.4rem;
+    background:
+        radial-gradient(120% 120% at 50% 0%, rgba(198, 160, 246, 0.12), transparent 60%),
+        linear-gradient(160deg, var(--mantine-color-dark-7), var(--mantine-color-dark-8));
     border: 1px solid var(--mantine-color-dark-6);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .topRow,
@@ -38,56 +88,120 @@
     grid-column: 2 / 8;
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 0.5rem;
+    gap: 0.55rem;
 }
 
-.topRow {
-    grid-row: 1;
-}
-
-.bottomRow {
-    grid-row: 2;
-}
+.topRow { grid-row: 1; }
+.bottomRow { grid-row: 2; }
 
 .pit {
     position: relative;
     aspect-ratio: 1;
     border-radius: 50%;
-    border: 2px solid var(--mantine-color-dark-5);
-    background: var(--mantine-color-dark-8);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background:
+        radial-gradient(80% 80% at 50% 35%, rgba(255, 255, 255, 0.05), transparent 70%),
+        radial-gradient(120% 120% at 50% 120%, var(--mantine-color-dark-6), var(--mantine-color-dark-9));
     color: var(--mantine-color-dark-0);
-    font-size: 1.1rem;
-    font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.35rem;
+    padding: 0.32rem;
     cursor: default;
-    transition: transform 0.1s ease, border-color 0.1s ease, background 0.1s ease;
+    box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.5);
+    transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .pitActive {
     cursor: pointer;
     border-color: var(--mantine-color-mauve-4);
-    background: var(--mantine-color-dark-7);
+    box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(198, 160, 246, 0.35), 0 0 16px rgba(198, 160, 246, 0.45);
+    animation: pit-breathe 2s ease-in-out infinite;
 }
 
 .pitActive:hover {
-    transform: scale(1.06);
-    background: var(--mantine-color-mauve-9);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(198, 160, 246, 0.6), 0 0 22px rgba(198, 160, 246, 0.7);
+}
+
+@keyframes pit-breathe {
+    0%, 100% { box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(198, 160, 246, 0.3), 0 0 12px rgba(198, 160, 246, 0.35); }
+    50% { box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(198, 160, 246, 0.5), 0 0 20px rgba(198, 160, 246, 0.6); }
+}
+
+.pitFlash {
+    animation: pit-flash 0.85s ease;
+}
+
+@keyframes pit-flash {
+    0% { box-shadow: inset 0 0 0 rgba(0, 0, 0, 0), 0 0 0 3px rgba(238, 212, 159, 0.9), 0 0 26px rgba(238, 212, 159, 0.9); transform: scale(1.08); }
+    100% { box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.5); transform: scale(1); }
 }
 
 .pitCount {
     position: absolute;
-    bottom: 1px;
-    right: 6px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    opacity: 0.55;
+    bottom: 0;
+    right: 5px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: var(--mantine-color-dark-0);
+    opacity: 0.5;
     pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-/* Stone dots inside pits and stores. */
+/* ---- Stores ---- */
+
+.store {
+    grid-row: 1 / 3;
+    min-width: 3.4rem;
+    border-radius: 1.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background:
+        radial-gradient(90% 50% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 70%),
+        linear-gradient(180deg, var(--mantine-color-dark-6), var(--mantine-color-dark-9));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.45rem;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--mantine-color-dark-0);
+    box-shadow: inset 0 6px 16px rgba(0, 0, 0, 0.55);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.storeLeft { grid-column: 1; }
+.storeRight { grid-column: 8; }
+
+.storeMine {
+    border-color: rgba(198, 160, 246, 0.5);
+    box-shadow: inset 0 6px 16px rgba(0, 0, 0, 0.55), 0 0 14px rgba(198, 160, 246, 0.25);
+}
+
+.storeCelebrate {
+    animation: store-celebrate 0.85s ease;
+}
+
+@keyframes store-celebrate {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.1); box-shadow: inset 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 28px rgba(238, 212, 159, 0.85); }
+    100% { transform: scale(1); }
+}
+
+.store .stones {
+    max-height: 45%;
+}
+
+.storeCount {
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* ---- Marbles ---- */
+
 .stones {
     display: flex;
     flex-wrap: wrap;
@@ -99,70 +213,114 @@
 }
 
 .stone {
-    width: 8px;
-    height: 8px;
+    width: var(--stone-size, 14px);
+    height: var(--stone-size, 14px);
     border-radius: 50%;
-    background: var(--mantine-color-mauve-3);
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
-    animation: stone-pop 0.25s ease;
+    background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 45%),
+        radial-gradient(circle at 50% 55%, var(--c, #c6a0f6), color-mix(in srgb, var(--c, #c6a0f6) 65%, black));
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+    animation: stone-drop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes stone-pop {
-    0% {
-        transform: scale(0);
-    }
-    70% {
-        transform: scale(1.3);
-    }
+@keyframes stone-drop {
+    0% { transform: translateY(-7px) scale(0.4); opacity: 0.3; }
+    60% { transform: translateY(0) scale(1.25); opacity: 1; }
+    100% { transform: translateY(0) scale(1); }
+}
+
+/* ---- Flying capture stones ---- */
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 5;
+}
+
+.flyingStone {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 45%),
+        radial-gradient(circle at 50% 55%, var(--c, #eed49f), color-mix(in srgb, var(--c, #eed49f) 65%, black));
+    box-shadow: 0 0 10px rgba(238, 212, 159, 0.7);
+    animation: fly 0.6s cubic-bezier(0.4, 0, 0.5, 1) forwards;
+}
+
+@keyframes fly {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    70% { opacity: 1; }
     100% {
-        transform: scale(1);
+        transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(0.45);
+        opacity: 0;
     }
 }
 
-.store {
-    grid-row: 1 / 3;
-    min-width: 3.25rem;
-    border-radius: 1.75rem;
-    border: 2px solid var(--mantine-color-dark-5);
-    background: var(--mantine-color-dark-8);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.4rem;
+/* ---- Win banner ---- */
+
+.banner {
+    padding: 0.5rem 1.4rem;
+    border-radius: 1rem;
     font-size: 1.5rem;
     font-weight: 800;
+    text-align: center;
+    animation: banner-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.banner_win {
+    color: var(--mantine-color-dark-9);
+    background: linear-gradient(120deg, var(--mantine-color-yellow-4), var(--mantine-color-peach-4));
+    box-shadow: 0 0 26px rgba(238, 212, 159, 0.6);
+}
+
+.banner_draw {
     color: var(--mantine-color-dark-0);
+    border: 1px solid var(--mantine-color-dark-5);
 }
 
-.store .stones {
-    max-height: 40%;
+.banner_lose {
+    color: var(--mantine-color-dark-2);
 }
 
-.storeLeft {
-    grid-column: 1;
+@keyframes banner-pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    70% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); }
 }
 
-.storeRight {
-    grid-column: 8;
-}
+/* ---- Confetti ---- */
 
-.storeMine {
-    border-color: var(--mantine-color-mauve-5);
-}
-
-.storeCount {
+.confetti {
+    position: fixed;
+    inset: 0;
     pointer-events: none;
+    overflow: hidden;
+    z-index: 50;
+}
+
+.confettiPiece {
+    position: absolute;
+    top: -24px;
+    border-radius: 2px;
+    opacity: 0.95;
+    animation-name: confetti-fall;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(var(--rot, 360deg)); opacity: 0.9; }
 }
 
 @media (max-width: 480px) {
-    .pit {
-        font-size: 0.95rem;
-    }
-
     .store {
-        min-width: 2.5rem;
-        font-size: 1.2rem;
+        min-width: 2.6rem;
+        font-size: 1.25rem;
     }
 }

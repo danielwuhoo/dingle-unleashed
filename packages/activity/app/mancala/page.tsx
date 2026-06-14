@@ -1,17 +1,30 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Avatar, Button, Group, Loader, Modal, Paper, Stack, Text, Title } from '@mantine/core';
 import { useDiscordAuth } from '@/lib/hooks';
 import { useMancalaLobby, useMockMancala, MancalaLobby, LobbyPlayer, LastMove, SOW_STEP_MS } from '@/lib/mancala-client';
 import { MancalaState, STORE, Seat, legalMoves, pitsForSeat, sowPath } from '@/lib/mancala-engine';
+import { playTick, playCapture, playWin, playLose, useMute } from '@/lib/mancala-sound';
 import classes from './mancala.module.css';
+
+// Catppuccin accent palette for the marbles / confetti.
+const MARBLE_COLORS = ['#c6a0f6', '#8bd5ca', '#f5a97f', '#8aadf4', '#a6da95', '#eed49f', '#f5bde6', '#91d7e3'];
 
 function avatarUrl(userId: string, avatar?: string | null): string | undefined {
     if (!avatar) return undefined;
     const ext = avatar.startsWith('a_') ? 'gif' : 'png';
     return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.${ext}?size=64`;
+}
+
+// Marbles shrink as a pit/store fills so a big pile stays tidy instead of overflowing.
+function marbleSize(count: number, store: boolean): number {
+    if (count <= 4) return store ? 14 : 16;
+    if (count <= 8) return 13;
+    if (count <= 12) return 10;
+    if (count <= 18) return 8;
+    return store ? 7 : 6;
 }
 
 export default function MancalaPage() {
@@ -74,7 +87,7 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                 </Text>
             </Group>
 
-            <Title order={2}>Mancala</Title>
+            <Title order={2} className={classes.lobbyTitle}>Mancala</Title>
             <Text size="sm" c="dimmed">Challenge someone to a game.</Text>
 
             <Stack gap="xs" w="100%" maw={420}>
@@ -87,8 +100,8 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
                 )}
             </Stack>
 
-            <Button variant="light" color="mauve" onClick={onPractice}>
-                Practice vs Bot
+            <Button variant="light" color="mauve" radius="xl" onClick={onPractice}>
+                🤖 Practice vs Bot
             </Button>
 
             <Modal
@@ -137,13 +150,13 @@ function LobbyView({ lobby, onPractice }: { lobby: MancalaLobby; onPractice: () 
 function PlayerRow({ player, onChallenge }: { player: LobbyPlayer; onChallenge: () => void }) {
     const busy = player.status === 'playing';
     return (
-        <Paper withBorder p="sm" radius="md">
+        <Paper withBorder p="sm" radius="md" className={classes.playerRow}>
             <Group justify="space-between">
                 <Group gap="sm">
                     <Avatar src={avatarUrl(player.userId, player.avatar)} radius="xl" size="md" />
                     <Text fw={600}>{player.username}</Text>
                 </Group>
-                <Button size="xs" color="mauve" disabled={busy} onClick={onChallenge}>
+                <Button size="xs" color="mauve" radius="xl" disabled={busy} onClick={onChallenge}>
                     {busy ? 'in game' : 'challenge'}
                 </Button>
             </Group>
@@ -153,48 +166,75 @@ function PlayerRow({ player, onChallenge }: { player: LobbyPlayer; onChallenge: 
 
 function MatchView({ lobby, myUserId, onLeave }: { lobby: MancalaLobby; myUserId: string; onLeave: () => void }) {
     const { match, result, lastMove, sendMove, rematch } = lobby;
+    const { muted, toggle } = useMute();
     if (!match) return null;
 
     const { state, seat, opponent } = match;
-    const banner = getBanner(state, seat, result, myUserId);
+    const isOver = state.status === 'over';
+    const myTurn = !isOver && state.turn === seat;
+    const outcome = getOutcome(state, seat, result, myUserId);
 
     return (
         <Stack align="center" gap="md" className={classes.matchView}>
+            {isOver && outcome === 'win' && <Confetti />}
+
             <Group justify="space-between" w="100%" maw={560}>
-                <Text component="span" size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={onLeave}>
+                <Text component="span" size="sm" c="dimmed" className={classes.leaveLink} onClick={onLeave}>
                     ← leave
                 </Text>
-                <Group gap="xs">
-                    <Avatar src={avatarUrl(opponent.userId, opponent.avatar)} radius="xl" size="sm" />
-                    <Text size="sm">vs {opponent.username}</Text>
+                <Group gap="sm">
+                    <Group gap="xs">
+                        <Avatar src={avatarUrl(opponent.userId, opponent.avatar)} radius="xl" size="sm" />
+                        <Text size="sm">vs {opponent.username}</Text>
+                    </Group>
+                    <Text component="span" className={classes.muteBtn} onClick={toggle} title={muted ? 'Unmute' : 'Mute'}>
+                        {muted ? '🔇' : '🔊'}
+                    </Text>
                 </Group>
             </Group>
 
-            <Text fw={700} c={state.status === 'playing' && state.turn === seat ? 'green' : 'dimmed'}>
-                {banner}
-            </Text>
+            {isOver ? (
+                <div className={`${classes.banner} ${classes[`banner_${outcome}`]}`}>{bannerText(outcome)}</div>
+            ) : (
+                <Text fw={700} className={classes.turnText} c={myTurn ? 'green' : 'dimmed'}>
+                    {myTurn ? '✨ Your turn' : `${opponent.username}'s turn`}
+                </Text>
+            )}
 
             <Board key={match.matchId} state={state} lastMove={lastMove} seat={seat} onPit={sendMove} />
 
-            {state.status === 'over' && (
+            {isOver && (
                 <Group>
-                    <Button color="mauve" onClick={rematch}>Rematch</Button>
-                    <Button variant="default" onClick={onLeave}>Back to lobby</Button>
+                    <Button color="mauve" radius="xl" onClick={rematch}>Rematch</Button>
+                    <Button variant="default" radius="xl" onClick={onLeave}>Back to lobby</Button>
                 </Group>
             )}
         </Stack>
     );
 }
 
-function getBanner(state: MancalaState, seat: Seat, result: MancalaLobby['result'], myUserId: string): string {
-    if (result?.reason === 'forfeit') {
-        return result.forfeitedBy === myUserId ? 'You forfeited' : 'Opponent left — you win!';
-    }
-    if (state.status === 'over') {
-        if (state.winner === 'draw') return "It's a draw!";
-        return state.winner === seat ? 'You win! 🎉' : 'You lose';
-    }
-    return state.turn === seat ? 'Your turn' : "Opponent's turn";
+type Outcome = 'win' | 'lose' | 'draw';
+
+function getOutcome(state: MancalaState, seat: Seat, result: MancalaLobby['result'], myUserId: string): Outcome {
+    if (result?.reason === 'forfeit') return result.forfeitedBy === myUserId ? 'lose' : 'win';
+    if (state.winner === 'draw') return 'draw';
+    return state.winner === seat ? 'win' : 'lose';
+}
+
+function bannerText(outcome: Outcome): string {
+    if (outcome === 'win') return 'You win! 🎉';
+    if (outcome === 'draw') return "It's a draw! 🤝";
+    return 'You lose 😔';
+}
+
+interface FlyingStone {
+    id: string;
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+    color: string;
+    delay: number;
 }
 
 function Board({
@@ -209,12 +249,18 @@ function Board({
     onPit: (pit: number) => void;
 }) {
     // `display` is the visually-shown board, which lags the authoritative state
-    // during the sow animation. It settles to state.pits when the animation ends.
+    // during the sow animation, then settles to state.pits when it ends.
     const [display, setDisplay] = useState<number[]>(state.pits);
     const [animating, setAnimating] = useState(false);
+    const [flashPits, setFlashPits] = useState<number[]>([]);
+    const [celebrateStore, setCelebrateStore] = useState<number | null>(null);
+    const [flying, setFlying] = useState<FlyingStone[]>([]);
+
     const displayRef = useRef<number[]>(state.pits);
     const animatedMoveRef = useRef<LastMove | null>(null);
     const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const boardRef = useRef<HTMLDivElement | null>(null);
+    const pitEls = useRef<Record<number, HTMLElement | null>>({});
 
     const setBoard = (pits: number[]) => {
         displayRef.current = pits;
@@ -228,25 +274,76 @@ function Board({
 
     useEffect(() => clearTimers, []);
 
+    // Spawn marbles that fly from a captured pit into the store.
+    const flyToStore = (fromIdx: number, storeIdx: number, count: number) => {
+        const board = boardRef.current;
+        const fromEl = pitEls.current[fromIdx];
+        const storeEl = pitEls.current[storeIdx];
+        if (!board || !fromEl || !storeEl) return;
+        const b = board.getBoundingClientRect();
+        const f = fromEl.getBoundingClientRect();
+        const s = storeEl.getBoundingClientRect();
+        const x = f.left + f.width / 2 - b.left;
+        const y = f.top + f.height / 2 - b.top;
+        const dx = s.left + s.width / 2 - b.left - x;
+        const dy = s.top + s.height / 2 - b.top - y;
+        const n = Math.min(count, 6);
+        const stones: FlyingStone[] = Array.from({ length: n }).map((_, k) => ({
+            id: `${storeIdx}-${fromIdx}-${k}-${Date.now()}-${Math.random()}`,
+            x,
+            y,
+            dx,
+            dy,
+            color: MARBLE_COLORS[(fromIdx + k) % MARBLE_COLORS.length],
+            delay: k * 45,
+        }));
+        setFlying((prev) => [...prev, ...stones]);
+        const ids = new Set(stones.map((st) => st.id));
+        const t = setTimeout(() => setFlying((prev) => prev.filter((st) => !ids.has(st.id))), 750 + n * 45);
+        timersRef.current.push(t);
+    };
+
     useEffect(() => {
         if (lastMove && lastMove !== animatedMoveRef.current) {
-            animatedMoveRef.current = lastMove;
+            const move = lastMove;
+            animatedMoveRef.current = move;
             clearTimers();
             setAnimating(true);
 
             const from = displayRef.current.slice();
-            const path = sowPath(from, lastMove.seat, lastMove.pit);
+            const path = sowPath(from, move.seat, move.pit);
             const work = from.slice();
-            work[lastMove.pit] = 0;
+            work[move.pit] = 0;
             setBoard(work.slice());
 
             path.forEach((idx, i) => {
                 const t = setTimeout(() => {
                     work[idx] += 1;
                     setBoard(work.slice());
+                    playTick(i);
                     if (i === path.length - 1) {
                         const settle = setTimeout(() => {
-                            setBoard(state.pits.slice()); // apply captures / end-game sweep
+                            // Detect captures (pits that lost stones to the store mid-game).
+                            if (state.status === 'playing') {
+                                const captured: number[] = [];
+                                for (let p = 0; p < 14; p += 1) {
+                                    if (p === STORE[0] || p === STORE[1]) continue;
+                                    if (state.pits[p] < work[p]) captured.push(p);
+                                }
+                                if (captured.length > 0) {
+                                    const storeIdx = STORE[move.seat];
+                                    setFlashPits(captured);
+                                    setCelebrateStore(storeIdx);
+                                    playCapture();
+                                    captured.forEach((p) => flyToStore(p, storeIdx, work[p] - state.pits[p]));
+                                    const clear = setTimeout(() => {
+                                        setFlashPits([]);
+                                        setCelebrateStore(null);
+                                    }, 850);
+                                    timersRef.current.push(clear);
+                                }
+                            }
+                            setBoard(state.pits.slice());
                             setAnimating(false);
                         }, SOW_STEP_MS);
                         timersRef.current.push(settle);
@@ -260,12 +357,20 @@ function Board({
                 setAnimating(false);
             }
         } else if (!lastMove) {
-            // Fresh match / no move yet — show the board as-is.
             animatedMoveRef.current = null;
             setBoard(state.pits.slice());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lastMove, state]);
+
+    // Win/lose chime, once, when the game ends.
+    useEffect(() => {
+        if (state.status === 'over') {
+            if (state.winner === seat) playWin();
+            else if (state.winner !== 'draw') playLose();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.status]);
 
     const oppSeat: Seat = seat === 0 ? 1 : 0;
     const myPits = pitsForSeat(seat); // bottom row, sowing order left→right
@@ -273,13 +378,23 @@ function Board({
     const canMove = state.status === 'playing' && state.turn === seat && !animating;
     const legal = canMove ? legalMoves(state, seat) : [];
 
+    const setPitEl = (idx: number) => (el: HTMLElement | null) => {
+        pitEls.current[idx] = el;
+    };
+
     return (
-        <div className={classes.board}>
-            <Store value={display[STORE[oppSeat]]} variant="opp" position="left" />
+        <div className={classes.board} ref={boardRef}>
+            <Store
+                value={display[STORE[oppSeat]]}
+                variant="opp"
+                position="left"
+                celebrate={celebrateStore === STORE[oppSeat]}
+                elRef={setPitEl(STORE[oppSeat])}
+            />
 
             <div className={classes.topRow}>
                 {oppPits.map((pit) => (
-                    <Pit key={pit} value={display[pit]} clickable={false} />
+                    <Pit key={pit} value={display[pit]} clickable={false} flash={flashPits.includes(pit)} elRef={setPitEl(pit)} />
                 ))}
             </div>
 
@@ -289,47 +404,146 @@ function Board({
                         key={pit}
                         value={display[pit]}
                         clickable={legal.includes(pit)}
+                        flash={flashPits.includes(pit)}
+                        elRef={setPitEl(pit)}
                         onClick={() => onPit(pit)}
                     />
                 ))}
             </div>
 
-            <Store value={display[STORE[seat]]} variant="mine" position="right" />
+            <Store
+                value={display[STORE[seat]]}
+                variant="mine"
+                position="right"
+                celebrate={celebrateStore === STORE[seat]}
+                elRef={setPitEl(STORE[seat])}
+            />
+
+            <div className={classes.overlay}>
+                {flying.map((s) => (
+                    <span
+                        key={s.id}
+                        className={classes.flyingStone}
+                        style={
+                            {
+                                left: s.x,
+                                top: s.y,
+                                animationDelay: `${s.delay}ms`,
+                                '--dx': `${s.dx}px`,
+                                '--dy': `${s.dy}px`,
+                                '--c': s.color,
+                            } as React.CSSProperties
+                        }
+                    />
+                ))}
+            </div>
         </div>
     );
 }
 
-function Stones({ count }: { count: number }) {
+function Stones({ count, store = false }: { count: number; store?: boolean }) {
+    const cap = store ? 30 : 18;
+    const visible = Math.min(count, cap);
+    const size = marbleSize(count, store);
     return (
-        <div className={classes.stones}>
-            {Array.from({ length: count }).map((_, i) => (
-                <span key={i} className={classes.stone} />
+        <div className={classes.stones} style={{ '--stone-size': `${size}px` } as React.CSSProperties}>
+            {Array.from({ length: visible }).map((_, i) => (
+                <span
+                    key={i}
+                    className={classes.stone}
+                    style={{ '--c': MARBLE_COLORS[i % MARBLE_COLORS.length] } as React.CSSProperties}
+                />
             ))}
         </div>
     );
 }
 
-function Pit({ value, clickable, onClick }: { value: number; clickable: boolean; onClick?: () => void }) {
+function Pit({
+    value,
+    clickable,
+    flash,
+    onClick,
+    elRef,
+}: {
+    value: number;
+    clickable: boolean;
+    flash?: boolean;
+    onClick?: () => void;
+    elRef?: (el: HTMLButtonElement | null) => void;
+}) {
     return (
         <button
+            ref={elRef}
             type="button"
-            className={`${classes.pit} ${clickable ? classes.pitActive : ''}`}
+            className={`${classes.pit} ${clickable ? classes.pitActive : ''} ${flash ? classes.pitFlash : ''}`}
             disabled={!clickable}
             onClick={onClick}
         >
             <Stones count={value} />
-            <span className={classes.pitCount}>{value}</span>
+            {value > 0 && <span className={classes.pitCount}>{value}</span>}
         </button>
     );
 }
 
-function Store({ value, variant, position }: { value: number; variant: 'mine' | 'opp'; position: 'left' | 'right' }) {
+function Store({
+    value,
+    variant,
+    position,
+    celebrate,
+    elRef,
+}: {
+    value: number;
+    variant: 'mine' | 'opp';
+    position: 'left' | 'right';
+    celebrate?: boolean;
+    elRef?: (el: HTMLDivElement | null) => void;
+}) {
     return (
         <div
-            className={`${classes.store} ${variant === 'mine' ? classes.storeMine : ''} ${position === 'left' ? classes.storeLeft : classes.storeRight}`}
+            ref={elRef}
+            className={`${classes.store} ${variant === 'mine' ? classes.storeMine : ''} ${
+                position === 'left' ? classes.storeLeft : classes.storeRight
+            } ${celebrate ? classes.storeCelebrate : ''}`}
         >
             <span className={classes.storeCount}>{value}</span>
-            <Stones count={value} />
+            <Stones count={value} store />
+        </div>
+    );
+}
+
+function Confetti() {
+    const pieces = useMemo(
+        () =>
+            Array.from({ length: 90 }).map((_, i) => ({
+                id: i,
+                left: Math.random() * 100,
+                color: MARBLE_COLORS[i % MARBLE_COLORS.length],
+                delay: Math.random() * 0.6,
+                duration: 2.4 + Math.random() * 1.8,
+                rot: Math.random() * 720 - 360,
+                size: 6 + Math.random() * 7,
+            })),
+        [],
+    );
+    return (
+        <div className={classes.confetti}>
+            {pieces.map((p) => (
+                <span
+                    key={p.id}
+                    className={classes.confettiPiece}
+                    style={
+                        {
+                            left: `${p.left}%`,
+                            background: p.color,
+                            width: p.size,
+                            height: p.size,
+                            animationDelay: `${p.delay}s`,
+                            animationDuration: `${p.duration}s`,
+                            '--rot': `${p.rot}deg`,
+                        } as React.CSSProperties
+                    }
+                />
+            ))}
         </div>
     );
 }
